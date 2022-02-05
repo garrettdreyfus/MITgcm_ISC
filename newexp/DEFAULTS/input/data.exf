@@ -1,0 +1,22 @@
+# =============++======
+# | EXF parameters    |
+# =============++======
+
+ &EXF_NML_01
+ exf_iprec=64,
+ useExfYearlyFields=.FALSE.,
+ useExfCheckRange=.FALSE.,
+ &
+
+ &EXF_NML_02
+ &
+
+ &EXF_NML_03
+ &
+
+ &EXF_NML_04
+ &
+
+ &EXF_NML_OBCS
+ &
+

@@ -1,0 +1,11 @@
+#
+# *******************
+# Calendar Parameters
+# *******************
+
+ &CAL_NML
+   TheCalendar='model',
+   startDate_1=00000101,
+   startDate_2=0,
+   calendarDumps = .FALSE.,
+ &

@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# $Header: MITgcm/tools/build_options/ardbeg_ucla$
+# $Name: ardbeg_ucla $
+#
+# Opt file for MITgcm runs using MPI, tested on ardbeg.atmos.ucla.edu.
+
+### Specify compilers
+FC=/opt/intel/oneapi/compiler/2021.2.0/linux/bin/intel64/ifort
+DEFINES='-DALLOW_USE_MPI -DALWAYS_USE_MPI -DWORDLENGTH=4'
+CPP='/opt/intel/oneapi/compiler/2021.2.0/linux/bin/intel64/icc -traditional -E -'
+CC='/opt/intel/oneapi/compiler/2021.2.0/linux/bin/intel64/icc'
+EXTENDED_SRC_FLAG='-132'
+
+### Using impi
+INCLUDEDIRS="/usr/include"
+INCLUDES="-I/usr/include -I/opt/intel/oneapi/compiler/2021.2.0/linux/compiler/include -I/opt/intel/oneapi/mpi/2021.2.0/include"
+LIBS='-lmpi -lmpifort  -ldl -lpthread -lrt -L/opt/iwrf/lib -L/opt/intel/oneapi/compiler/2021.2.0/linux/compiler/lib/intel64 -L/opt/intel/oneapi/mpi/2021.2.0/lib -L/opt/intel/oneapi/mpi/2021.2.0/lib/release' 
+
+### Additional includes and libs for netcdf
+#INCLUDES="-I/usr/include"
+#LIBS='-lnetcdf -lnetcdff -L/opt/intel/lib
+
+### Flags
+NOOPTFLAGS='-O2'
+FFLAGS="$FFLAGS -W0 -WB -msse2 -convert big_endian -assume byterecl"
+FOPTIM='-O2 -align -ip'
