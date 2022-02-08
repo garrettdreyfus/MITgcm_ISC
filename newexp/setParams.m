@@ -54,6 +54,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   t1year = 365*t1day;  
   %%% Metres in one kilometre
   m1km = 1000; 
+  %%% Pascals in 1 decibar
+  Pa1dbar = 1e4;
       
   
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -114,15 +116,21 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   Htrough = 300; %%% Trough depth
   Wtrough = 15*m1km; %%% Trough width
   Xtrough = Lx/2; %%% Longitude of trough
+  
+  %%% Atmospheric properties
+  atemp0 = -20; %%% Typical value based on AMPS       
+  atemp0 = 273.16+atemp0; %%% Convert to degrees K
+  aqh0 = 1e-3; %%% Typical value based on AMPS       
+  lwdown0 = 200; %%% Typical value based on AMPS       
+  swdown0 = 0; %%% Based on AMPS, typical summer value = 300, typical winter value = 0
+  precip0 = 0;
+  runoff0 = 0;
 
   %%% Package options
-  useSEAICE = false;
+  useSEAICE = true;
   useSHELFICE = true;     
-  useLAYERS = false;  
-  
-  %%% TODO  
-  useEXF = useSEAICE;
-  EXFoption = 3; %%% Read-in atemp, aqh, swdown, lwdown,precip, and runoff. Compute hflux, swflux and sflux. 
+  useLAYERS = false;      
+  useEXF = useSEAICE;  
   
   %%% OBCS package options
   useOBCS = true;    
@@ -188,7 +196,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%% file IO stuff
   parm01.addParm('readBinaryPrec',64,PARM_INT);
   parm01.addParm('useSingleCpuIO',true,PARM_BOOL);
-  parm01.addParm('debugLevel',2,PARM_INT);
+  parm01.addParm('debugLevel',-1,PARM_INT);
   %%% Wet-point method at boundaries - may improve boundary stability
   parm01.addParm('useJamartWetPoints',true,PARM_BOOL);
   parm01.addParm('useJamartMomAdv',true,PARM_BOOL);
@@ -425,7 +433,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
  
   
   
-  %%% TODO buoyancy frequency looks very low close to the surface
+ 
   
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%%%% NORTHERN TEMPERATURE/SALINITY PROFILES %%%%%
@@ -434,70 +442,42 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%% Bottom properties offshore, taken from Meijers et al. (2010)
   %%% measurements. We need these because the KN climatology only goes down
   %%% to 2000m
-  s_bot = 34.66;
+  s_bot = 34.65;
   pt_bot = -0.5;
-  
-%   %%% Load sections from Kapp Norvegia climatology (Hattermann 2018) 
-  ptemp_KN = ncread('KappNorvegiaCLM.nc','ptemp'); %%% at sea level pressure
-  salt_KN = ncread('KappNorvegiaCLM.nc','salt');
-  pres_KN = ncread('KappNorvegiaCLM.nc','pressure');
+  s_mid = 34.67;
+  pt_mid = 1;
+  s_surf = 34.15;
+  pt_surf = -1.8;
+  Zsml = -50;
+  Zcdw_pt = -300;
+  Zcdw_s = Zcdw_pt - 100; %%% This is important - salinity maximum needs to 
+                          %%% be deeper or else you end up with very weak 
+                          %%% buoyancy frequency just below the pycnocline
     
+%   %%% Load sections from Kapp Norvegia climatology (Hattermann 2018) 
+%   ptemp_KN = ncread('KappNorvegiaCLM.nc','ptemp'); %%% at sea level pressure
+%   salt_KN = ncread('KappNorvegiaCLM.nc','salt');
+%   pres_KN = ncread('KappNorvegiaCLM.nc','pressure');
+%       
+%   %%% Winter means at offshore boundary
+%   ptemp_North = [squeeze(mean(ptemp_KN(:,end,6:8),3))' pt_bot];
+%   salt_North = [squeeze(mean(salt_KN(:,end,6:8),3))' s_bot];
+% %   N_offshore = 40:45;
+% %   ptemp_North = [squeeze(mean(mean(ptemp_KN(:,N_offshore,6:8),3),2))' pt_bot];
+% %   salt_North = [squeeze(mean(mean(salt_KN(:,N_offshore,6:8),3),2))' s_bot];
+%   depth_North = [-pres_KN' -H];
+   
   
-  %%% Winter means at offshore boundary
-  ptemp_North = [squeeze(mean(ptemp_KN(:,end,6:8),3))' pt_bot];
-  salt_North = [squeeze(mean(salt_KN(:,end,6:8),3))' s_bot];
-%   N_offshore = 40:45;
-%   ptemp_North = [squeeze(mean(mean(ptemp_KN(:,N_offshore,6:8),3),2))' pt_bot];
-%   salt_North = [squeeze(mean(mean(salt_KN(:,N_offshore,6:8),3),2))' s_bot];
-  depth_North = [-pres_KN' -H];
+  %%% Artificially construct a hydrographic profile
+  depth_North_pt = [-H (-H+3*Zcdw_pt)/4 Zcdw_pt Zsml 0];
+  depth_North_s = [-H (-H+3*Zcdw_s)/4 Zcdw_s Zsml 0];
+  ptemp_North = [pt_bot (pt_bot+pt_mid)/2 pt_mid pt_surf pt_surf];
+  salt_North = [s_bot (s_bot+s_mid)/2 s_mid s_surf s_surf];
+ 
   
   %%% Interpolate to model grid
-  tNorth = interp1(depth_North,ptemp_North,zz,'PCHIP'); %%% reference pressure level: sea surface
-  sNorth = interp1(depth_North,salt_North,zz,'PCHIP');  %%% reference pressure level: sea surface
-  
-  
-%   zidx = find(sNorth==max(sNorth));
-%   %   sNorth(zidx+1:end) = 0.5*(sNorth(zidx+1:end)+max(sNorth));
-%   sNorth(zidx+1:end) = max(sNorth);
-%   tNorth(1) = -1.87;
-  
-%   load('NorthernBdry')
-%   sNorth = Snorth_exp_dense';
-%   tNorth = Tnorth_exp_dense';
-%   tNorth(1) = -1.87;
-
-%%% Calculate the freezing temperature at ocean surface using GSW toolbox
-%   Ai0 = 1; % Initial fractional sea ice cover,
-%   Hi0 = 1; % Initial sea ice thickness = 1m
-  Hs0 = 0; % Initial snow thickness = 0.1 m
-  Si0 = 6; % The salinity for 1m sea ice is about 6 g/kg. Cox et al., (1974). Salinity variations in sea ice. 
-  rho_i = 920; % Density of sea ice
-  pp0 = - zz; % This pressure is approximate, using a constant density
-
-  pp = pp0;
-  % %%% Calculate the true hydrostatic pressure, need to check
-  %     pp = zeros(size(zz));
-  %     DZ = zeros(size(zz));
-  %     DZ(1) = zz(1);
-  %     DZ(2:end) = zz(2:end)-zz(1:end-1);
-  %     insitu_rho_north_densmdjwf = densmdjwf(sNorth,tNorth,pp0)';         
-  %     P0 = 0; % surface atmospheric pressure
-  %     pp(1) = P0 - insitu_rho_north_densmdjwf(1)*g*DZ(1)/10^4;
-  %     for nz = 2:size(zz,2)
-  %         insitu_rho_north_densmdjwf(nz) = densmdjwf(sNorth(nz),tNorth(nz),pp(nz-1));
-  %         pp(nz) = pp(nz-1) - insitu_rho_north_densmdjwf(nz)*g*DZ(nz)/10^4;
-  %     end
-    
-  %%% Calculate the freezing temperature using GSW toolbox
-  %   pp = pp0;
-  %   pfreezing = rho_i*g*Hi0*Ai0/10^4+pp(1);
-  %   SA0 = gsw_SA_from_SP(sNorth(1),pfreezing,-12,-64);
-  %   saturation_fraction = 1 - Ai0; 
-  %   tNorth(1) = gsw_t_freezing(SA0,pfreezing,saturation_fraction);  %%% -1.8862
-  %   end 
-
-
-    
+  tNorth = interp1(depth_North_pt,ptemp_North,zz,'PCHIP'); %%% reference pressure level: sea surface
+  sNorth = interp1(depth_North_s,salt_North,zz,'PCHIP');  %%% reference pressure level: sea surface 
   
   %%% Plot the relaxation temperature
   if (showplots)
@@ -541,10 +521,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
  
-  %%% Check Brunt-Vaisala frequency using full EOS
-  %%% TODO need to calculate SA and CT
-  SA_north = sNorth;
-  CT_north = tNorth;
+  %%% Check Brunt-Vaisala frequency using full EOS      
+  pp = -rhoConst*g*zz/Pa1dbar; %%% Crude pressure estimate
+  SA_north =  gsw_SA_from_SP(sNorth,pp,0,-70);
+  CT_north = gsw_CT_from_pt(SA_north,tNorth);
   [N2_north, pp_mid_north] = gsw_Nsquared(SA_north,CT_north,pp,-64);  
   dzData = zz(1:end-1)-zz(2:end);
 
@@ -558,7 +538,11 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
       end
     end
   end
-  Rd = Cig./(pi*abs(f0+beta*Y(1,:)));
+  %%% N.B. this is actually wrong - the wave speed should be NH/pi, whereas 
+  %%% here we define it as NH. Doing this results in a smaller time step,
+  %%% which actually seems to be closer to the stability threshold for
+  %%% some reason.
+  Rd = Cig./(pi*abs(f0+beta*Y(1,:))); 
 
   if (showplots)
     figure(fignum);
@@ -741,7 +725,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     SHELFICEHeatCapacity_Cp = 2000; %%% Default value
     rhoShelfIce = 917;              %%% Default value
     SHELFICEheatTransCoeff = 0;     %%% Turn off linear heat transfer
-    SHELFICEthetaSurface = -20;     %%% Default value %%% TODO should match atmospheric temp over the sea ice?
+    SHELFICEthetaSurface = atemp0;  %%% Match prescribed atmospheric temperature
     SHELFICEuseGammaFrict = true;   %%% Turn on friction-dependent heat transfer
     SHELFICEboundaryLayer = false;  %%% Turn on to average velocities over top dz of water column when computing friction velocity
     SHELFICEconserve = false;       %%% Turns on conservative form of 3-equation IOBL parameterization
@@ -762,10 +746,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     %%% field for that depth at each horizontal point. Once the model
     %%% starts running, it will continuously evolve that pressure, so the
     %%% pressure we prescribe here doesn't really matter - we just don't
-    %%% want to blow up the model!
-    salt_ref = 34;
-    temp_ref = -1.9;   
-    Pa1dbar = 1e4;
+    %%% want to blow up the model!        
     SHELFICEloadAnomaly = zeros(Nx,Ny);
     for i=1:Nx      
       for j=1:Ny
@@ -775,7 +756,6 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
             break;
           end
           Pressure = -rhoConst*g*zz(k);    
-%           rhoShelfIce = densmdjwf(salt_ref,temp_ref,Pressure/Pa1dbar);
           rhoShelfIce = densmdjwf(sNorth(k),tNorth(k),Pressure/Pa1dbar);
           SHELFICEloadAnomaly(i,j) = SHELFICEloadAnomaly(i,j) + (g*(rhoShelfIce-rhoConst)*dz(k));                
          end
@@ -821,10 +801,11 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     seaice_parm01 = parmlist;
     SEAICE_PARM = {seaice_parm01};
 
-      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-      %%%%%%%%% SEA ICE  %%%%%%%%%%%%
-      %%%%%%%% PARAMETERS %%%%%%%%%%%
-      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%% SEA ICE  %%%%%%%%%%%%
+    %%%%%%%% PARAMETERS %%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
   % Oringinal albedos from llc_1/48th  other values from llc_2160
   % 
 
@@ -876,6 +857,13 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %   SEAICE_frazilFrac       = 1.0; % frazil to sea ice conversion rate, as fraction (relative to the local freezing point of sea ice water)
 
 
+    %%% For initial conditions
+    Ai0 = 1;
+    Hi0 = 0.5;
+    Hs0 = 0.1;
+    Si0 = 6; % The salinity for 1m sea ice is about 6 g/kg. Cox et al., (1974). Salinity variations in sea ice. 
+    rho_i = 920; % Density of sea ice
+    
     % Initial fractional sea ice cover, range[0,1]; initializes variable AREA;
     Area = Ai0.*ones(Nx,Ny);
   %   Area(:,Ny-seaiceSpongeThickness:Ny) = 0;
@@ -887,7 +875,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     % Initial salinity of sea ice averaged over grid cell in g/m^2; initializes variable HSALT;
     Hsalt = (Si0*rho_i*Hi0).*ones(Nx,Ny); 
 
-    uIce = zeros(Nx,Ny); %%% Initial sea ice velosity
+    uIce = zeros(Nx,Ny); %%% Initial sea ice velocity
     vIce = zeros(Nx,Ny);
 
     AreaFile = 'AreaFile.bin';
@@ -984,276 +972,109 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     EXF_NML_OBCS = parmlist;
     EXF_PARM = {EXF_NML_01,EXF_NML_02,EXF_NML_03,EXF_NML_04,EXF_NML_OBCS}; 
 
+    exf_albedo = 0.15;     
+    exf_iprec         = 64;  
+    useExfYearlyFields= false;
+    useExfCheckRange  = false;  
+    useRelativeWind   = false;
+    repeatPeriod      = 20*t1year;
 
+  %     exf_offset_atemp =  273.16;
+      %%%runoff from ERA is in hours, need to convert to seconds
+  %     exf_inscal_runoff = 1.14e-04;
 
-    if(useSEAICE)
+    EXF_NML_01.addParm('exf_albedo',exf_albedo,PARM_INT);    
+    EXF_NML_01.addParm('exf_iprec',exf_iprec,PARM_INT);
+    EXF_NML_01.addParm('useExfYearlyFields',useExfYearlyFields,PARM_BOOL);
+    EXF_NML_01.addParm('useExfCheckRange',useExfCheckRange,PARM_BOOL);    
+    EXF_NML_01.addParm('useRelativeWind',useRelativeWind,PARM_BOOL);    
+    EXF_NML_01.addParm('repeatPeriod',repeatPeriod,PARM_REAL);
+    %   EXF_NML_03.addParm('exf_offset_atemp',exf_offset_atemp,PARM_REAL);
+    %   EXF_NML_03.addParm('exf_inscal_runoff',exf_inscal_runoff,PARM_REAL);    
 
-        exf_albedo = 0.15; 
-        exf_scal_BulkCdn  = 1.015;
-        exf_iprec         = 64;  
-        useExfYearlyFields= false;
-        useExfCheckRange  = false;
-      %  	useRelativeWind   = true;
-        useRelativeWind   = false;
-          repeatPeriod      = 20*t1year;
+    %%% Wind speeds
+    Ua = 6;
+    Va = 6;
+    
+    %%% Wind speed matrices
+    uwind = Ua*ones(Nx,Ny);    
+    vwind = Va*ones(Nx,Ny); 
 
-      %     exf_offset_atemp =  273.16;
-          %%%runoff from ERA is in hours, need to convert to seconds
-      %     exf_inscal_runoff = 1.14e-04;
+    %%% Plot the wind speed 
+    if (showplots)
+      figure(fignum);
+      fignum = fignum + 1;
+      clf;
+      plot(yy/1000,uwind(1,:),'LineWidth',1.5);
+      xlabel('Offshore distance (km)');
+      ylabel('u_a');
+      title('Zonal wind velocity (m/s)');
+      set(gca,'fontsize',fontsize-1);
+      PLOT = gcf;
+      PLOT.Position = [263 149 567 336];  
+    end    
 
-        EXF_NML_01.addParm('exf_albedo',exf_albedo,PARM_INT);
-        if (EXFoption ~= 5)
-           EXF_NML_01.addParm('exf_scal_BulkCdn',exf_scal_BulkCdn,PARM_REAL);
-        end
-        EXF_NML_01.addParm('exf_iprec',exf_iprec,PARM_INT);
-        EXF_NML_01.addParm('useExfYearlyFields',useExfYearlyFields,PARM_BOOL);
-        EXF_NML_01.addParm('useExfCheckRange',useExfCheckRange,PARM_BOOL);
-        if(~useEXFwindstress)
-            EXF_NML_01.addParm('useRelativeWind',useRelativeWind,PARM_BOOL);
-        end
-        EXF_NML_01.addParm('repeatPeriod',repeatPeriod,PARM_REAL);
-      %   EXF_NML_03.addParm('exf_offset_atemp',exf_offset_atemp,PARM_REAL);
-      %   EXF_NML_03.addParm('exf_inscal_runoff',exf_inscal_runoff,PARM_REAL);
-        if (useEXFwindstress)
-           readStressOnCgrid = true;
-           EXF_NML_01.addParm('readStressOnCgrid',readStressOnCgrid,PARM_BOOL);
-        end
+    %%% Plot the wind speed 
+    if (showplots)
+      figure(fignum);
+      fignum = fignum + 1;
+      clf;
+      plot(yy/1000,vwind(1,:),'LineWidth',1.5);
+      xlabel('Offshore distance (km)');
+      ylabel('v_a');
+      title('Meridional wind velocity (m/s)');
+      set(gca,'fontsize',fontsize-1);
+      PLOT = gcf;
+      PLOT.Position = [263 149 567 336];  
+    end    
 
-          rho_a = 1.3;               %%% Air density, kg/m^3
-      %     Ua = -6;
-      %     Va = 6;
+    uwindfile = 'uwindfile.bin';
+    vwindfile = 'vwindfile.bin';
+    writeDataset(uwind,fullfile(inputpath,uwindfile),ieee,prec);
+    writeDataset(vwind,fullfile(inputpath,vwindfile),ieee,prec);
+    EXF_NML_02.addParm('uwindfile',uwindfile,PARM_STR);
+    EXF_NML_02.addParm('vwindfile',vwindfile,PARM_STR);  
+       
+    %%% Create input matrices
+    atemp = atemp0.*ones(Nx,Ny); % Surface (2-m) air temperature in deg K    
+    aqh = aqh0*ones(Nx,Ny);
+    swdown = swdown0.*ones(Nx,Ny); 
+    precip = precip0.*ones(Nx,Ny); 
+    runoff = runoff0.*ones(Nx,Ny);  
+    lwdown = lwdown0*ones(Nx,Ny); 
 
-        if (Ua~=0)
-      %     uwind = -sqrt(abs(tau_zonal)/rho_a/SEAICE_drag).*ones(Nx,Ny); % Zonal 10-m wind speed 
-          uwind = [Ua:-Ua/(Ny-1):0].*ones(Nx,1); 
-        else
-          uwind = zeros(Nx,Ny); 
-        end
-        if (Va~=0)
-      %     vwind = sqrt(abs(tau_merid)/rho_a/SEAICE_drag).*ones(Nx,Ny); % Meridional 10-m wind speed
-           vwind = [Va:-Va/(Ny-1):0].*ones(Nx,1); 
-        else
-          vwind = zeros(Nx,Ny); 
-        end
-
-         %%% Plot the wind speed 
-        if (showplots)
-          figure(fignum);
-          fignum = fignum + 1;
-          clf;
-          plot(yy/1000,uwind(1,:),'LineWidth',1.5);
-          xlabel('Offshore distance (km)');
-          ylabel('u_a');
-          title('Zonal wind velocity (m/s)');
-          set(gca,'fontsize',fontsize-1);
-          PLOT = gcf;
-          PLOT.Position = [263 149 567 336];  
-        end    
-
-         %%% Plot the wind speed 
-        if (showplots)
-          figure(fignum);
-          fignum = fignum + 1;
-          clf;
-          plot(yy/1000,vwind(1,:),'LineWidth',1.5);
-          xlabel('Offshore distance (km)');
-          ylabel('v_a');
-          title('Meridional wind velocity (m/s)');
-          set(gca,'fontsize',fontsize-1);
-          PLOT = gcf;
-          PLOT.Position = [263 149 567 336];  
-        end    
-
-
-      %     Ur = sqrt((abs(tau_zonal)+abs(tau_merid))./rho_a./SEAICE_drag).*ones(Nx,Ny);
-        uwindfile = 'uwindfile.bin';
-        vwindfile = 'vwindfile.bin';
-        writeDataset(uwind,fullfile(inputpath,uwindfile),ieee,prec);
-        writeDataset(vwind,fullfile(inputpath,vwindfile),ieee,prec);
-        EXF_NML_02.addParm('uwindfile',uwindfile,PARM_STR);
-        EXF_NML_02.addParm('vwindfile',vwindfile,PARM_STR);  
-
-
-      % Read-in atemp, aqh, swdown, lwdown, precip, and runoff. Compute hflux, swflux and sflux.
-          Kice = 2.1656; %%% Ice thermal conductivity, W/(m*degK)
-          ice_abs = 1-SEAICE_dryIceAlb; %%% Ice absorption
-
-      % meanLWdown = zeros(1,size([-50:10],2));
-      %  for  TaDegC = -50:10
-          TaDegC = -10;
-          Ta = 273.16+TaDegC; %%% Surface air temperature, degK
-          Tw = 273.16+double(tNorth(1)); %%% surface water temperature
-          TisDegC = -0.65;
-      %     TisDegC = double(tNorth(1)); 
-          Tis = 273.16+TisDegC; %%% Ice surface temperature
-          SEAICE_emissivity = 0.970018; %%% Ice emissivity
-          ocn_e = 5.50e-8 / 5.670e-8;  %%% Ocean emissivity, 0.97
-          sigma = 5.67/10^8; %%% Stefan-Boltzman'n constant
-          exf_iceCh = 1.63e-3; %%% sensible heat transfer coeff. over sea-ice   
-          Cp_air = 1004; %%% Heat capacity at constant pressure 1004 J K-1 kg-1
-          atemp = Ta.*ones(Nx,Ny); % Surface (2-m) air temperature in deg K
-          aqh = 6.1094/(rho_a*287*Tis/100)*exp(17.625*TisDegC/(TisDegC+243.04)).*ones(Nx,Ny); % 0.0057, Surface (2m) specific humidity in kg/kg. Typical range: 0 < aqh < 0.02
-
-
-
-
-      if(EXFoption == 3)
-          swdown = 0.*ones(Nx,Ny); 
-          precip = 0.*ones(Nx,Ny); 
-          runoff = 0.*ones(Nx,Ny);  
-      %     if(usezonalwind || useoffshorewind)
-      %         SH = rho_a*Cp_air*exf_iceCh.*Ur.*abs(Ta-Tis);
-      %         LH = -40.*SH/mean(mean(SH));
-      %         lwdown = (ice_e*sigma*Tis^4 + SH + LH)/ice_e;
-      %         SH = mean(mean(SH)).*ones(Nx,Ny);
-      %         LH = mean(mean(LH)).*ones(Nx,Ny);
-      %         lwdown =  mean(mean(lwdown)).*ones(Nx,Ny);
-      %         meanSHdown = mean(mean(SH))
-      %         meanLHdown = mean(mean(LH))
-      %     else
-      %         lwdown = (ice_e*sigma*Tis^4)/ice_e.*ones(Nx,Ny);
-      %     end
-      %     meanLWdown = mean(mean(lwdown))
-      %     lwdown = 320.*ones(Nx,Ny);  
-
-          CondHeat = 0.5*1/Hi0;  %%% SItice ~ -1.62 degC, Tio ~ -1.87 degC => Conductive heat flux from ice surface to ocean is about 0.5 W/m^2
-          lwdown = (CondHeat/ice_abs+320)*ones(Nx,Ny);
-          lwdown(1)
-
-          if (Hi0==0)
-              lwdown = 324.1085*ones(Nx,Ny);
-              lwdown(1)
-          end
-
-
-
-        %%% Plot the downward longwave radiation in W/m^2
-        if (showplots)
-          figure(fignum);
-          fignum = fignum + 1;
-          clf;
-          plot(yy/1000,squeeze(lwdown(1,:)),'LineWidth',1.5);
-          xlabel('Offshore distance (km)');
-          ylabel('LWdown (W/m^2)');
-          title('Downward longwave radiation');
-          set(gca,'fontsize',fontsize-1);
-          PLOT = gcf;
-          PLOT.Position = [263 149 567 336];  
-        end
-          %%% Save the figure
-          savefig([imgpath '/LWdown.fig']);
-          saveas(gcf,[imgpath '/LWdown.png']);
-
-          atempfile  = 'atempfile.bin';
-          aqhfile    = 'aqhfile.bin';
-          swdownfile = 'swdownfile.bin';
-          lwdownfile = 'lwdownfile.bin';
-          precipfile = 'precipfile.bin'; 
-          runofffile = 'runofffile.bin';
-          writeDataset(atemp,fullfile(inputpath,atempfile),ieee,prec);
-          writeDataset(aqh,fullfile(inputpath,aqhfile),ieee,prec);
-          writeDataset(swdown,fullfile(inputpath,swdownfile),ieee,prec);
-          writeDataset(lwdown,fullfile(inputpath,lwdownfile),ieee,prec);
-          writeDataset(precip,fullfile(inputpath,precipfile),ieee,prec);
-          writeDataset(runoff,fullfile(inputpath,runofffile),ieee,prec);
-          EXF_NML_02.addParm('atempfile',atempfile,PARM_STR);
-          EXF_NML_02.addParm('aqhfile',aqhfile,PARM_STR);
-          EXF_NML_02.addParm('swdownfile',swdownfile,PARM_STR);
-          EXF_NML_02.addParm('lwdownfile',lwdownfile,PARM_STR);
-          EXF_NML_02.addParm('precipfile',precipfile,PARM_STR);
-          EXF_NML_02.addParm('runofffile',runofffile,PARM_STR);
-
-      elseif(EXFoption == 5)    
-          hs = 0.*ones(Nx,Ny); 
-          hl = 0.*ones(Nx,Ny);  
-          swdown = 0.*ones(Nx,Ny); 
-          Tisurf = 273.16+temp_relax(:,:,1); %%% assume ice temperature at surface equals bottom
-      %     lwdown = SEAICE_emissivity*sigma.*Tisurf.^4/(1-ice_abs);
-          lwdown = SEAICE_emissivity*sigma.*Tisurf.^4;
-          evap = 0.*ones(Nx,Ny);  
-          precip = 0.*ones(Nx,Ny); 
-          runoff = 0.*ones(Nx,Ny);  
-          hsfile  = 'hsfile.bin';
-          hlfile  = 'hlfile.bin';
-          swdownfile = 'swdownfile.bin';
-          lwdownfile = 'lwdownfile.bin';
-          evapfile  = 'evapfile.bin';
-          precipfile = 'precipfile.bin'; 
-          runofffile = 'runofffile.bin'; 
-          writeDataset(hs,fullfile(inputpath,hsfile),ieee,prec);
-          writeDataset(hl,fullfile(inputpath,hlfile),ieee,prec);
-          writeDataset(swdown,fullfile(inputpath,swdownfile),ieee,prec);
-          writeDataset(lwdown,fullfile(inputpath,lwdownfile),ieee,prec);
-          writeDataset(evap,fullfile(inputpath,evapfile),ieee,prec);    
-          writeDataset(precip,fullfile(inputpath,precipfile),ieee,prec);
-          writeDataset(runoff,fullfile(inputpath,runofffile),ieee,prec);
-          EXF_NML_02.addParm('hsfile',hsfile,PARM_STR);
-          EXF_NML_02.addParm('hlfile',hlfile,PARM_STR);
-          EXF_NML_02.addParm('swdownfile',swdownfile,PARM_STR);
-          EXF_NML_02.addParm('lwdownfile',lwdownfile,PARM_STR);
-          EXF_NML_02.addParm('evapfile',evapfile,PARM_STR); 
-          EXF_NML_02.addParm('precipfile',precipfile,PARM_STR);
-          EXF_NML_02.addParm('runofffile',runofffile,PARM_STR);
-
-
-      elseif (EXFoption == 6)
-          hs = 0.*ones(Nx,Ny); 
-          hl = 0.*ones(Nx,Ny);  
-          swflux = 0.*ones(Nx,Ny);  
-          lwflux = 0.*ones(Nx,Ny);  
-          evap = 0.*ones(Nx,Ny);  
-          precip = 0.*ones(Nx,Ny); 
-          runoff = 0.*ones(Nx,Ny);  
-          hsfile  = 'hsfile.bin';
-          hlfile  = 'hlfile.bin';
-          swfluxfile  = 'swfluxfile.bin';
-          lwfluxfile  = 'lwfluxfile.bin';
-          evapfile  = 'evapfile.bin';
-          precipfile = 'precipfile.bin'; 
-          runofffile = 'runofffile.bin'; 
-          writeDataset(hs,fullfile(inputpath,hsfile),ieee,prec);
-          writeDataset(hl,fullfile(inputpath,hlfile),ieee,prec);
-          writeDataset(swflux,fullfile(inputpath,swfluxfile),ieee,prec);
-          writeDataset(lwflux,fullfile(inputpath,lwfluxfile),ieee,prec);
-          writeDataset(evap,fullfile(inputpath,evapfile),ieee,prec);    
-          writeDataset(precip,fullfile(inputpath,precipfile),ieee,prec);
-          writeDataset(runoff,fullfile(inputpath,runofffile),ieee,prec);
-          EXF_NML_02.addParm('hsfile',hsfile,PARM_STR);
-          EXF_NML_02.addParm('hlfile',hlfile,PARM_STR);
-          EXF_NML_02.addParm('swfluxfile',swfluxfile,PARM_STR);
-          EXF_NML_02.addParm('lwfluxfile',lwfluxfile,PARM_STR);
-          EXF_NML_02.addParm('evapfile',evapfile,PARM_STR); 
-          EXF_NML_02.addParm('precipfile',precipfile,PARM_STR);
-          EXF_NML_02.addParm('runofffile',runofffile,PARM_STR);
-
-      elseif (EXFoption == 4)   
-          swflux = 0.*ones(Nx,Ny);  
-          lwflux = 0.*ones(Nx,Ny);  
-          precip = 0.*ones(Nx,Ny); 
-          runoff = 0.*ones(Nx,Ny);  
-          atempfile  = 'atempfile.bin';
-          aqhfile    = 'aqhfile.bin';
-          swfluxfile  = 'swfluxfile.bin';
-          lwfluxfile  = 'lwfluxfile.bin';
-          precipfile = 'precipfile.bin'; 
-          runofffile = 'runofffile.bin'; 
-          writeDataset(atemp,fullfile(inputpath,atempfile),ieee,prec);
-          writeDataset(aqh,fullfile(inputpath,aqhfile),ieee,prec);
-          writeDataset(swflux,fullfile(inputpath,swfluxfile),ieee,prec);
-          writeDataset(lwflux,fullfile(inputpath,lwfluxfile),ieee,prec);
-          writeDataset(precip,fullfile(inputpath,precipfile),ieee,prec);
-          writeDataset(runoff,fullfile(inputpath,runofffile),ieee,prec);
-          EXF_NML_02.addParm('atempfile',atempfile,PARM_STR);
-          EXF_NML_02.addParm('aqhfile',aqhfile,PARM_STR);
-          EXF_NML_02.addParm('swfluxfile',swfluxfile,PARM_STR);
-          EXF_NML_02.addParm('lwfluxfile',lwfluxfile,PARM_STR);
-          EXF_NML_02.addParm('precipfile',precipfile,PARM_STR);
-          EXF_NML_02.addParm('runofffile',runofffile,PARM_STR);
-
-      end
-
+    %%% Plot the downward longwave radiation in W/m^2
+    if (showplots)
+      figure(fignum);
+      fignum = fignum + 1;
+      clf;
+      plot(yy/1000,squeeze(lwdown(1,:)),'LineWidth',1.5);
+      xlabel('Offshore distance (km)');
+      ylabel('LWdown (W/m^2)');
+      title('Downward longwave radiation');
+      set(gca,'fontsize',fontsize-1);
+      PLOT = gcf;
+      PLOT.Position = [263 149 567 336];  
     end
 
+    atempfile  = 'atempfile.bin';
+    aqhfile    = 'aqhfile.bin';
+    swdownfile = 'swdownfile.bin';
+    lwdownfile = 'lwdownfile.bin';
+    precipfile = 'precipfile.bin'; 
+    runofffile = 'runofffile.bin';
+    writeDataset(atemp,fullfile(inputpath,atempfile),ieee,prec);
+    writeDataset(aqh,fullfile(inputpath,aqhfile),ieee,prec);
+    writeDataset(swdown,fullfile(inputpath,swdownfile),ieee,prec);
+    writeDataset(lwdown,fullfile(inputpath,lwdownfile),ieee,prec);
+    writeDataset(precip,fullfile(inputpath,precipfile),ieee,prec);
+    writeDataset(runoff,fullfile(inputpath,runofffile),ieee,prec);
+    EXF_NML_02.addParm('atempfile',atempfile,PARM_STR);
+    EXF_NML_02.addParm('aqhfile',aqhfile,PARM_STR);
+    EXF_NML_02.addParm('swdownfile',swdownfile,PARM_STR);
+    EXF_NML_02.addParm('lwdownfile',lwdownfile,PARM_STR);
+    EXF_NML_02.addParm('precipfile',precipfile,PARM_STR);
+    EXF_NML_02.addParm('runofffile',runofffile,PARM_STR);
 
     %%% Create the data.exf file
     write_data_exf(inputpath,EXF_PARM,listterm,realfmt);
@@ -1434,7 +1255,7 @@ diag_fields_avg = {...
   %%%%%% Daily output 
   diag_fields_inst = {...
     'UVEL','VVEL','WVEL','THETA','SALT','ETAN', ...
-    %'SIarea','SIheff','SIuice','SIvice' ...
+    'SIarea','SIheff','SIuice','SIvice' ...
       };
   numdiags_inst = length(diag_fields_inst);  
   diag_freq_inst =1*t1year/12;
@@ -1478,7 +1299,7 @@ diag_fields_avg = {...
   %%%%%%%%%%%%%%%%
   %%%%%%%%%%%%%%%%
   
-  %%% TODO configure with a single OB at the northern end of the domain
+  
   
   %%%%%%%%%%%%%%%%%%%%%%%
   %%%%% OBCS SET-UP %%%%%
@@ -1523,11 +1344,11 @@ diag_fields_avg = {...
   useOBCSsponge = true;
   obcs_parm01.addParm('useOBCSsponge',useOBCSsponge,PARM_BOOL);
     
-  if(useSEAICE)
-      useSeaiceSponge = true;
-      obcs_parm01.addParm('useSeaiceSponge',useSeaiceSponge,PARM_BOOL);
+  if (useSEAICE)
+    useSeaiceSponge = true;
+    obcs_parm01.addParm('useSeaiceSponge',useSeaiceSponge,PARM_BOOL);
   else 
-      useSeaiceSponge = false;
+    useSeaiceSponge = false;
   end
   
   %%% Set boundary velocities and temperatures
@@ -1545,87 +1366,23 @@ diag_fields_avg = {...
   obcs_parm01.addParm('useOBCSprescribe',useOBCSprescribe,PARM_BOOL);
   obcs_parm01.addParm('OBNtFile','OBNtFile.bin',PARM_STR);
   obcs_parm01.addParm('OBNsFile','OBNsFile.bin',PARM_STR);  
+  
+  if (useSEAICE)
 
-  %%% TODO
-    if(useSEAICE)
-%     OBNa = Ai0.*ones(Nx,1);
-%     OBNh = Hi0.*ones(Nx,1);
-%     OBNsn = Hs0.*ones(Nx,1); %%% snow thickness
-%     OBNsl = Si0.*ones(Nx,1); %%% sea ice salinity
-%     OBNuice = -0.24*ones(Nx,1);
-%     OBNuice = 0*ones(Nx,1);
-%     OBNvice = 0.005.*ones(Nx,1);
-%     writeDataset(OBNa,fullfile(inputpath,'OBNaFile.bin'),ieee,prec);
-%     writeDataset(OBNh,fullfile(inputpath,'OBNhFile.bin'),ieee,prec);
-%     writeDataset(OBNsn,fullfile(inputpath,'OBNsnFile.bin'),ieee,prec);
-%     writeDataset(OBNsl,fullfile(inputpath,'OBNslFile.bin'),ieee,prec);
-%     writeDataset(OBNuice,fullfile(inputpath,'OBNuiceFile.bin'),ieee,prec);
-%     writeDataset(OBNvice,fullfile(inputpath,'OBNviceFile.bin'),ieee,prec);
-%     obcs_parm01.addParm('OBNaFile','OBNaFile.bin',PARM_STR);
-%     obcs_parm01.addParm('OBNhFile','OBNhFile.bin',PARM_STR);
-%     obcs_parm01.addParm('OBNsnFile','OBNsnFile.bin',PARM_STR);
-%     obcs_parm01.addParm('OBNslFile','OBNslFile.bin',PARM_STR);
-%     obcs_parm01.addParm('OBNuiceFile','OBNuiceFile.bin',PARM_STR);
-%     obcs_parm01.addParm('OBNviceFile','OBNviceFile.bin',PARM_STR);
-
-%%% Calculate free-drift ice velocities at the southern boundary, ignoring
-%%% ice internal stress, pressure caused by sea surface hight variation.
-%%% Assume zonal ocean velocity at the coast = 0, 
-%%% meridional ocean at the coast averaged over tidal cycles = 0,            
-%%% fractional ice cover Ai0 = 1.
-    rho_o = 1027;         %%% Water density, kg/m^3
-    tao_aix = rho_a*SEAICE_drag*sqrt(Ua^2+Va^2)*Ua;       %%% Air-ice stress in x direction, N/m2
-    tao_aiy = rho_a*SEAICE_drag*sqrt(Ua^2+Va^2)*Va;       %%% Air-ice stress in y direction, N/m2
-    syms ui vi
-    eq1 =  rho_i*Hi0*f0*vi + tao_aix - rho_o*SEAICE_waterDrag*sqrt(ui^2+vi^2)*ui;
-    eq2 = -rho_i*Hi0*f0*ui + tao_aiy - rho_o*SEAICE_waterDrag*sqrt(ui^2+vi^2)*vi;
-    eqns = [eq1, eq2];
-    [solui solvi] = solve(eqns,[ui vi]);
-    Sui = double(real(solui));
-    Svi = double(real(solvi));
-    ui_idx = (Sui<0);
-    obsuice = Sui(ui_idx)
-    obsvice = Svi(ui_idx)
-    
-
-    if (useRelaxSurfT)
-        obsuice = 0
-        obsvice = 0
-    end
-   
-    if(Ua == 0 && Va == 0)
-        obsuice = 0
-        obsvice = 0
-    end
-    
-    OBSa = Ai0.*ones(Nx,1);
-    OBSh = Hi0.*ones(Nx,1);
-    OBSsn = Hs0.*ones(Nx,1); %%% snow thickness
-    OBSsl = Si0.*ones(Nx,1); %%% sea ice salinity
-    OBSuice = obsuice.*ones(Nx,1); %%% Initial zonal ice velocity should be westward (negative!) or zero.
-    OBSvice = obsvice.*ones(Nx,1);
-    writeDataset(OBSa,fullfile(inputpath,'OBSaFile.bin'),ieee,prec);
-    writeDataset(OBSh,fullfile(inputpath,'OBShFile.bin'),ieee,prec);
-    writeDataset(OBSsn,fullfile(inputpath,'OBSsnFile.bin'),ieee,prec);
-    writeDataset(OBSsl,fullfile(inputpath,'OBSslFile.bin'),ieee,prec);
-    writeDataset(OBSuice,fullfile(inputpath,'OBSuiceFile.bin'),ieee,prec);
-    writeDataset(OBSvice,fullfile(inputpath,'OBSviceFile.bin'),ieee,prec);
-    obcs_parm01.addParm('OBSaFile','OBSaFile.bin',PARM_STR);
-    obcs_parm01.addParm('OBShFile','OBShFile.bin',PARM_STR);
-    obcs_parm01.addParm('OBSsnFile','OBSsnFile.bin',PARM_STR);
-    obcs_parm01.addParm('OBSslFile','OBSslFile.bin',PARM_STR);
-    obcs_parm01.addParm('OBSuiceFile','OBSuiceFile.bin',PARM_STR);
-    obcs_parm01.addParm('OBSviceFile','OBSviceFile.bin',PARM_STR);
-    
-    
-    
-    
+    %%% Northern boundary conditions for sea ice
+    Ai0 = 0;
+    Hi0 = 0;
+    Hs0 = 0;
+    Si0 = 0;
+    SIu0 = 0;
+    SIv0 = 0;
+                
     OBNa = Ai0.*ones(Nx,1);
     OBNh = Hi0.*ones(Nx,1);
-    OBNsn = Hs0.*ones(Nx,1); %%% snow thickness
-    OBNsl = Si0.*ones(Nx,1); %%% sea ice salinity
-    OBNuice = obsuice.*ones(Nx,1); %%% Initial zonal ice velocity should be westward (negative!) or zero.
-    OBNvice = obsvice.*ones(Nx,1);
+    OBNsn = Hs0.*ones(Nx,1); 
+    OBNsl = Si0.*ones(Nx,1); 
+    OBNuice = SIu0.*ones(Nx,1); 
+    OBNvice = SIv0.*ones(Nx,1);
     
     writeDataset(OBNa,fullfile(inputpath,'OBNaFile.bin'),ieee,prec);
     writeDataset(OBNh,fullfile(inputpath,'OBNhFile.bin'),ieee,prec);
@@ -1641,7 +1398,7 @@ diag_fields_avg = {...
     obcs_parm01.addParm('OBNviceFile','OBNviceFile.bin',PARM_STR);
     
     
-    end
+  end
 
 %   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %   %%%%% ORLANSKI OPTIONS (OBCS_PARM02) %%%%%
@@ -1682,10 +1439,10 @@ diag_fields_avg = {...
     
   end
     
-  %%% TODO
+  
   if (useSeaiceSponge)
-       T_relaxinner = 864000/10;
-       T_relaxbound = 43200/6;
+    T_relaxinner = 864000/10;
+    T_relaxbound = 43200/6;
     Arelaxobcsinner = T_relaxinner;
     Arelaxobcsbound = T_relaxbound;
     Hrelaxobcsinner = T_relaxinner;
@@ -1704,6 +1461,10 @@ diag_fields_avg = {...
     obcs_parm05.addParm('SNrelaxobcsinner',SNrelaxobcsinner,PARM_REAL);
     obcs_parm05.addParm('SNrelaxobcsbound',SNrelaxobcsbound,PARM_REAL);
   end
+  
+  
+  
+  
     
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%%%% WRITE THE 'data.obcs' FILE %%%%%

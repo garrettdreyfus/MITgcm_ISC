@@ -136,9 +136,9 @@
   use_pbs = true; %%% set true for execution via PBS
   cluster = 'ardbeg';
   queue = 'all.q'; 
-  sNx = 40; %%% no. of x-gridpoints per tile
+  sNx = 20; %%% no. of x-gridpoints per tile
   sNy = 25; %%% no. of y-gridpoints per tile
-  nPx = 5; %%% no. of processors in x-direction
+  nPx = 10; %%% no. of processors in x-direction
   nPy = 8; %%% no. of processors in y-direction
   Nr = 100; %%% no. of z-gridpoints
 

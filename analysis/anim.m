@@ -14,7 +14,7 @@ mac_plots = 0;
 loadexp;
 
 %%% Select diagnostic variable to animate
-diagnum = 4;
+diagnum = 1;
 outfname = diag_fileNames{1,diagnum};
 
 %%% Data index in the output data files
@@ -25,14 +25,14 @@ outfidx = 1;
 xyplot = 0;
 
 %%% Vertical layer index to use for top-down plots
-xylayer = 1;
+xylayer = 50;
 
 %%% Set true to plot the field in the lowest active cell at each horizontal
 %%% location
 botplot = 0;
 
 %%% Set true for a zonal average
-yzavg = 0;
+yzavg = 1;
 
 %%% Layer to plot in the y/z plane
 yzlayer = 99;
