@@ -14,7 +14,7 @@ mac_plots = 0;
 loadexp;
 
 %%% Select diagnostic variable to animate
-diagnum = 1;
+diagnum = 5;
 outfname = diag_fileNames{1,diagnum};
 
 %%% Data index in the output data files
@@ -22,10 +22,10 @@ outfidx = 1;
 
 %%% If set true, plots a top-down view of the field in a given layer.
 %%% Otherwise plots a side-on view of the zonally-averaged field.
-xyplot = 0;
+xyplot = 1;
 
 %%% Vertical layer index to use for top-down plots
-xylayer = 50;
+xylayer = 1;
 
 %%% Set true to plot the field in the lowest active cell at each horizontal
 %%% location
@@ -35,7 +35,7 @@ botplot = 0;
 yzavg = 1;
 
 %%% Layer to plot in the y/z plane
-yzlayer = 99;
+yzlayer = 50;
 
 %%% Frequency of diagnostic output - should match that specified in
 %%% data.diagnostics.
@@ -52,24 +52,9 @@ if (xyplot)
   kmax = sum(ceil(hFac),3);
   kmax(kmax==0) = 1;
 else  
-  %%% Create mesh grid with vertical positions adjusted to sit on the bottom
+  %%% Create mesh gridith vertical positions adjusted to sit on the bottom
   %%% topography and at the surface
-  [ZZ,YY] = meshgrid(zz,yy/1000);  
-  for j=1:Ny
-    if (yzavg)
-      hFacC_col = squeeze(hFacC(:,j,:));    
-      hFacC_col = max(hFacC_col,[],1);    
-    else
-      hFacC_col = squeeze(hFacC(yzlayer,j,:))';
-    end
-    kmax = length(hFacC_col(hFacC_col>0));  
-    zz_botface = -sum(hFacC_col.*delR);
-    ZZ(j,1) = 0;
-    if (kmax>0)
-      ZZ(j,kmax) = zz_botface;
-    end
-  end
-  
+  [ZZ,YY] = meshgrid(zz,yy/1000);    
 end
 
 %%% Plotting options
@@ -167,6 +152,7 @@ for n=1:length(dumpIters)
       Ayz = squeeze(nanmean(Ayz,1));    
     else
       Ayz = squeeze(A(yzlayer,:,:,outfidx));
+      Ayz(squeeze(hFacC(yzlayer,:,:))==0) = NaN;
     end
     
     jrange = 1:Ny;

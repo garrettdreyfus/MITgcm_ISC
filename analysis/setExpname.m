@@ -8,7 +8,8 @@
 basedir = '/Volumes/Kilchoman/UCLA/Projects/MITgcm_ISC/';
 expdir = basedir;
 
-expname = 'test_for_Garrett';
+% expname = 'test_for_Garrett';
+expname = 'test_seaice';
 
 addpath ../newexp_ACC_AABW
 
