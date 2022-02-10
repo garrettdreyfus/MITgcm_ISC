@@ -35,7 +35,7 @@ botplot = 0;
 yzavg = 1;
 
 %%% Layer to plot in the y/z plane
-yzlayer = 50;
+yzlayer = 58;
 
 %%% Frequency of diagnostic output - should match that specified in
 %%% data.diagnostics.

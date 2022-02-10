@@ -125,7 +125,9 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   swdown0 = 0; %%% Based on AMPS, typical summer value = 300, typical winter value = 0
   precip0 = 0;
   runoff0 = 0;
-
+  Ua = -6; %%% Zonal wind speed
+  Va = 4; %%% Meridional wind speed
+  
   %%% Package options
   useSEAICE = true;
   useSHELFICE = true;     
@@ -159,8 +161,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   parm01.addParm('viscC2leith',0,PARM_REAL);
   parm01.addParm('viscC2leithD',0,PARM_REAL);  
   %%% diffusivity
-  parm01.addParm('tempAdvScheme',80,PARM_INT);
-  parm01.addParm('saltAdvScheme',80,PARM_INT);
+  parm01.addParm('tempAdvScheme',33,PARM_INT);
+  parm01.addParm('saltAdvScheme',33,PARM_INT);
   parm01.addParm('diffKrT',diffKrT,PARM_REAL);
   parm01.addParm('diffKhT',diffKhT,PARM_REAL);
   parm01.addParm('diffKrS',diffKrS,PARM_REAL);
@@ -843,7 +845,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     %%%SOSEdoesn't have a seaice dataset for salinity, they used this value
     %%%in their estimate
 
-    LSR_ERROR               = 1.0e-5;  
+    LSR_ERROR               = 1.0e-5; %%% Default is 2e-4 
     SEAICEnonLinIterMax     = 10;
 
     MIN_ATEMP               = -50;
@@ -864,7 +866,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
 
     %%% For initial conditions
     Ai0 = 1;
-    Hi0 = 0.5;
+    Hi0 = 1;
     Hs0 = 0.1;
     Si0 = 6; % The salinity for 1m sea ice is about 6 g/kg. Cox et al., (1974). Salinity variations in sea ice. 
     rho_i = 920; % Density of sea ice
@@ -995,15 +997,15 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     EXF_NML_01.addParm('useRelativeWind',useRelativeWind,PARM_BOOL);    
     EXF_NML_01.addParm('repeatPeriod',repeatPeriod,PARM_REAL);
     %   EXF_NML_03.addParm('exf_offset_atemp',exf_offset_atemp,PARM_REAL);
-    %   EXF_NML_03.addParm('exf_inscal_runoff',exf_inscal_runoff,PARM_REAL);    
-
-    %%% Wind speeds
-    Ua = -6;
-    Va = 6;
+    %   EXF_NML_03.addParm('exf_inscal_runoff',exf_inscal_runoff,PARM_REAL);       
     
     %%% Wind speed matrices
-    uwind = Ua*ones(Nx,Ny);    
+    uwind = Ua*ones(Nx,Ny); 
+    uwind(Y>Yicefront) = Ua*(1-(Y(Y>Yicefront)-Yicefront) / (Ly-Ln-Yicefront));
+    uwind(Y>Ly-Ln) = 0;
     vwind = Va*ones(Nx,Ny); 
+    vwind(Y>Yicefront) = Va*(1-(Y(Y>Yicefront)-Yicefront) / (Ly-Ln-Yicefront));
+    vwind(Y>Ly-Ln) = 0;
 
     %%% Plot the wind speed 
     if (showplots)
@@ -1263,7 +1265,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     'SIarea','SIheff','SIuice','SIvice' ...
       };
   numdiags_inst = length(diag_fields_inst);  
-  diag_freq_inst =1*t1year/12;
+%   diag_freq_inst = 1*t1year/12;
+  diag_freq_inst = 7*t1day;
   diag_phase_inst = 0;
   
   for n=1:numdiags_inst    
