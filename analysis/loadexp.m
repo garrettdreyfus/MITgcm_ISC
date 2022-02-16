@@ -102,3 +102,7 @@ hFacC = rdmds(fullfile(resultspath,'hFacC'));
 fid = fopen(fullfile(inputpath,bathyFile),'r','b');
 bathy = fread(fid,[Nx Ny],'real*8');
 fclose(fid);
+
+fid = fopen(fullfile(inputpath,SHELFICEtopoFile),'r','b');
+SHELFICEtopo = fread(fid,[Nx Ny],'real*8');
+fclose(fid);

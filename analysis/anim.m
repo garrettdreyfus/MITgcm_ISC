@@ -14,7 +14,7 @@ mac_plots = 0;
 loadexp;
 
 %%% Select diagnostic variable to animate
-diagnum = 5;
+diagnum = 4;
 outfname = diag_fileNames{1,diagnum};
 
 %%% Data index in the output data files
@@ -22,7 +22,7 @@ outfidx = 1;
 
 %%% If set true, plots a top-down view of the field in a given layer.
 %%% Otherwise plots a side-on view of the zonally-averaged field.
-xyplot = 1;
+xyplot = 0;
 
 %%% Vertical layer index to use for top-down plots
 xylayer = 1;
@@ -31,11 +31,47 @@ xylayer = 1;
 %%% location
 botplot = 0;
 
+%%% Set true to plot the field in the topmost wet cell at each horizontal
+%%% location
+topplot = 0;
+
+%%% Set true to plot the field in the middle of the water column at each
+%%% horizontal location
+midplot = 0;
+
 %%% Set true for a zonal average
-yzavg = 1;
+yzavg = 0;
 
 %%% Layer to plot in the y/z plane
-yzlayer = 58;
+yzlayer = 80;
+
+%%% Specify color range
+set_crange = 1;
+
+
+% crange = [-2.2 -1.6]; %/%% Filchner temp
+crange = [-3 1]; %%%temp
+% crange = [34.3 34.7]; %%% salinity
+% crange = [0 10]; %%%% for KPP hbl
+% crange = [0 1]; %%% For sea ice area
+% crange = [-.3 .3]; %%% For velocities or stresses
+% crange = [-1 1]*1e-4; %%% For freshwater fluxes
+% crange =[-100 100]; %%% Qnet
+% crange = [-300 300]; %%% swnet
+% crange = [0 3];
+% crange = [-0.01 0.01];
+
+% cmap = pmkmp(100,'Swtth');
+% cmap = cmocean('haline',100);
+% cmap = cmocean('thermal',100);
+% cmap = cmocean('ice',100);
+% cmap = haxby;
+cmap = jet(200);
+% cmap = redblue(100);
+
+% titlestr = 'Bottom salinity (g/kg)';
+% titlestr = 'Sea ice concentration';
+titlestr = '';
 
 %%% Frequency of diagnostic output - should match that specified in
 %%% data.diagnostics.
@@ -45,16 +81,63 @@ dumpIters = round((0:nDumps)*dumpFreq/deltaT);
 % dumpIters = dumpIters(dumpIters > nIter0);
 
 %%% Mesh grids for plotting
-hFac = hFacC;
-kmax = zeros(Nx,Ny);
 if (xyplot)
-  [YY,XX] = meshgrid(yy/1000,xx/1000);
-  kmax = sum(ceil(hFac),3);
-  kmax(kmax==0) = 1;
-else  
-  %%% Create mesh gridith vertical positions adjusted to sit on the bottom
+
+  [YY,XX] = meshgrid(yy,xx);
+  if (botplot || topplot || midplot)  
+    kmax = ones(Nx,Ny);
+    kmin = ones(Nx,Ny);
+    for i=1:Nx
+      for j=1:Ny
+        idx = find(squeeze(hFacC(i,j,:))>0);
+        if (~isempty(idx))
+          kmin(i,j) = min(idx);
+          kmax(i,j) = max(idx);
+        end
+      end
+    end
+    kn = ones(Nx,Ny);
+    kp= ones(Nx,Ny);
+    wn = 0.5*ones(Nx,Ny);
+    wp = 0.5*ones(Nx,Ny);
+    for i=1:Nx
+      for j=1:Ny
+        if (sum(hFacC(i,j,:),3)==0)
+          continue;
+        end
+        zmid = 0.5 * (SHELFICEtopo(i,j) + bathy(i,j));
+        kmid = max(find(squeeze(zz)>zmid));
+        if (isempty(kmid))
+          continue;
+        end
+        kp(i,j) = kmid;
+        kn(i,j) = kp(i,j) + 1;
+        wp(i,j) = (zmid-zz(kn(i,j))) / (zz(kp(i,j))-zz(kn(i,j)));
+        wn(i,j) = 1 - wp(i,j);
+      end
+    end
+  end
+
+else
+  
+  %%% Create mesh grid with vertical positions adjusted to sit on the bottom
   %%% topography and at the surface
-  [ZZ,YY] = meshgrid(zz,yy/1000);    
+  [ZZ,YY] = meshgrid(zz,yy);  
+  for j=1:Ny
+    if (yzavg)
+      hFacC_col = squeeze(hFacC(:,j,:));    
+      hFacC_col = max(hFacC_col,[],1);    
+    else
+      hFacC_col = squeeze(hFacC(yzlayer,j,:))';
+    end
+    zz_topface = zz(kmin(i,j))-(0.5-hFacC_col(kmin(i,j)))*delR(kmin(i,j));
+    zz_botface = zz(kmax(i,j))+(0.5-hFacC_col(kmax(i,j)))*delR(kmax(i,j));
+    ZZ(j,kmin(i,j)) = zz_topface;
+    if (kmax(i,j)>1)
+      ZZ(j,kmax(i,j)) = zz_botface;
+    end
+  end
+  
 end
 
 %%% Plotting options
@@ -124,24 +207,40 @@ for n=1:length(dumpIters)
       for i=1:Nx
         for j=1:Ny
           FF(i,j) = A(i,j,kmax(i,j));
-%           FF(i,j) = A(i,j,kmax(i,j))*hFac(i,j,kmax(i,j));
         end
       end
+      
+    elseif (topplot)
+      FF = zeros(Nx,Ny);
+      for i=1:Nx
+        for j=1:Ny
+          FF(i,j) = A(i,j,kmin(i,j));
+        end
+
+      end
+    elseif (midplot)
+      FF = zeros(Nx,Ny);
+      for i=1:Nx
+        for j=1:Ny
+          FF(i,j) = wp(i,j)*A(i,j,kp(i,j)) + wn(i,j)*A(i,j,kn(i,j));
+        end
+      end
+
     else
       FF = squeeze(A(:,:,xylayer,outfidx));        
+      FF(hFacC(:,:,xylayer)==0) = NaN;
     end
     
-    FF(hFacC(:,:,xylayer)==0) = NaN;
+    FF(sum(hFacC,3)==0) = NaN;
+    
 %     contourf(XX,YY,FF,100,'EdgeColor','None');  
     pcolor(XX,YY,FF);
     shading interp;
     xlabel('x (km)');
     ylabel('y (km)');
-    colormap jet;
-%     caxis([-1 1]);
-%     caxis([8 12]);
-%     caxis([-0.4 0])
-%     caxis([-6 5]);
+    
+    
+    
     
   %%% y/z zonally-averaged plot
   else
@@ -174,13 +273,17 @@ for n=1:length(dumpIters)
   
   end
     
+  
+  
   %%% Finish the plot
   handle=colorbar;
+  caxis(crange);
+  colormap(cmap);
   set(handle,'FontSize',fontsize);
   set(gca,'FontSize',fontsize);
-  title(['$t=',num2str(tyears(n),'%.1f'),'$ years'],'interpreter','latex');  
+  title([titlestr,' at $t=',num2str(tyears(n),'%.1f'),'$ years'],'interpreter','latex');  
   set(gca,'Position',plotloc);
-  annotation('textbox',[0.85 0.05 0.25 0.05],'String','$\overline{\theta}$ ($^\circ$C)','interpreter','latex','FontSize',fontsize+2,'LineStyle','None');
+%   annotation('textbox',[0.85 0.05 0.25 0.05],'String','$\overline{\theta}$ ($^\circ$C)','interpreter','latex','FontSize',fontsize+2,'LineStyle','None');
   M(n) = getframe(gcf);
   
 end

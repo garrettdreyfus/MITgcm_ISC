@@ -125,8 +125,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   swdown0 = 0; %%% Based on AMPS, typical summer value = 300, typical winter value = 0
   precip0 = 0;
   runoff0 = 0;
-  Ua = -6; %%% Zonal wind speed
-  Va = 4; %%% Meridional wind speed
+%   Ua = -6; %%% Zonal wind speed
+%   Va = 4; %%% Meridional wind speed
+  Ua = 0; %%% Zonal wind speed
+  Va = 0; %%% Meridional wind speed
   
   %%% Package options
   useSEAICE = true;
@@ -529,13 +531,20 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
 
  
   %%% Check Brunt-Vaisala frequency using full EOS      
-  pp = -rhoConst*g*zz/Pa1dbar; %%% Crude pressure estimate
-  SA_north =  gsw_SA_from_SP(sNorth,pp,0,-70);
-  CT_north = gsw_CT_from_pt(SA_north,tNorth);
-  [N2_north, pp_mid_north] = gsw_Nsquared(SA_north,CT_north,pp,-64);  
-  dzData = zz(1:end-1)-zz(2:end);
-
+%   pp = -rhoConst*g*zz/Pa1dbar; %%% Crude pressure estimate
+%   SA_north =  gsw_SA_from_SP(sNorth,pp,0,-70);
+%   CT_north = gsw_CT_from_pt(SA_north,tNorth);
+%   [N2_north, pp_mid_north] = gsw_Nsquared(SA_north,CT_north,pp,-64);  
+  
+  %%% Check Brunt-Vaisala frequency using model EOS      
+  N2_north = zeros(1,Nr-1);
+  pp_mid_north = 0.5*(pp(1:Nr-1)+pp(2:Nr));
+  for k=1:Nr-1
+    N2_north(k) = -(g/rhoConst)*(densmdjwf(sNorth(k),tNorth(k),pp_mid_north(k)) - densmdjwf(sNorth(k+1),tNorth(k+1),pp_mid_north(k))) / (zz(k)-zz(k+1));
+  end      
+  
   %%% Calculate internal wave speed and first Rossby radius of deformation
+  dzData = zz(1:end-1)-zz(2:end);
   N = sqrt(N2_north);
   Cig = zeros(size(yy));
   for j=1:Ny    
