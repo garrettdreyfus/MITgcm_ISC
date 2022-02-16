@@ -536,7 +536,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
 %   CT_north = gsw_CT_from_pt(SA_north,tNorth);
 %   [N2_north, pp_mid_north] = gsw_Nsquared(SA_north,CT_north,pp,-64);  
   
-  %%% Check Brunt-Vaisala frequency using model EOS      
+  %%% Check Brunt-Vaisala frequency using model EOS    
+  pp = -rhoConst*g*zz/Pa1dbar; %%% Crude pressure estimate
   N2_north = zeros(1,Nr-1);
   pp_mid_north = 0.5*(pp(1:Nr-1)+pp(2:Nr));
   for k=1:Nr-1
@@ -617,11 +618,11 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%% Max gravity wave speed using total ocean depth
   cgmax = Umax + cmax;
   %%% Advective CFL
-  deltaT_adv = min([0.5*dx/cmax,0.5*dy/cmax]);
+  deltaT_adv = min([0.25*dx/cmax,0.25*dy/cmax]);
   %%% Gravity wave CFL
-  deltaT_gw = min([0.5*dx/Umax,0.5*dy/Umax]);
+  deltaT_gw = min([0.25*dx/Umax,0.25*dy/Umax]);
   %%% CFL time step based on full gravity wave speed
-  deltaT_fgw = min([0.5*dx/cgmax,0.5*dy/cgmax]);
+  deltaT_fgw = min([0.25*dx/cgmax,0.25*dy/cgmax]);
     
   %%% Other stability conditions
   
@@ -640,8 +641,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   
   %%% Time step size  
   deltaT = min([deltaT_fgw deltaT_gw deltaT_adv deltaT_itl deltaT_Ah deltaT_Ar deltaT_KhT deltaT_KrT deltaT_A4]);
-  deltaT = round(deltaT) 
-%   deltaT = 100
+  deltaT = round(deltaT) ;
   nTimeSteps = ceil(simTime/deltaT);
   simTimeAct = nTimeSteps*deltaT
   
@@ -1052,7 +1052,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     EXF_NML_02.addParm('vwindfile',vwindfile,PARM_STR);  
        
     %%% Create input matrices
-    atemp = atemp0.*ones(Nx,Ny); % Surface (2-m) air temperature in deg K    
+    atemp = atemp0.*ones(Nx,Ny); % Surface (2-m) air temperature in deg K   
+    atemp(Y>Ly-Ln) = tNorth(1);    
     aqh = aqh0*ones(Nx,Ny);
     swdown = swdown0.*ones(Nx,Ny); 
     precip = precip0.*ones(Nx,Ny); 
