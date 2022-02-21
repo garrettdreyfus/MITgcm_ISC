@@ -121,7 +121,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   atemp0 = -20; %%% Typical value based on AMPS       
   atemp0 = 273.16+atemp0; %%% Convert to degrees K
   aqh0 = 1e-3; %%% Typical value based on AMPS       
-  lwdown0 = 200; %%% Typical value based on AMPS       
+  lwdown0 = 300; %%% Typical value based on AMPS       
   swdown0 = 0; %%% Based on AMPS, typical summer value = 300, typical winter value = 0
   precip0 = 0;
   runoff0 = 0;
@@ -869,9 +869,9 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     SEAICE_wetAlbTemp       = 0.0;
     SEAICE_saltFrac         = 0.3;
   %   SEAICE_frazilFrac       = 0.003;
-   SEAICE_frazilFrac       = 0.01;
+    SEAICE_frazilFrac       = 0.01;
   %   SEAICE_frazilFrac       = 1.0; % frazil to sea ice conversion rate, as fraction (relative to the local freezing point of sea ice water)
-
+    SEAICEpressReplFac = 0; %%% 1 activates regularization of the pressure via the strain rate, 0 deactivates. Values between 0 and 1 are permitted.
 
     %%% For initial conditions
     Ai0 = 1;
@@ -942,6 +942,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     seaice_parm01.addParm('SEAICE_wetAlbTemp',SEAICE_wetAlbTemp,PARM_REAL);
     seaice_parm01.addParm('SEAICE_saltFrac',SEAICE_saltFrac,PARM_REAL);
     seaice_parm01.addParm('SEAICE_frazilFrac',SEAICE_frazilFrac,PARM_REAL);
+    seaice_parm01.addParm('SEAICEpressReplFac',SEAICEpressReplFac,PARM_REAL);    
 
     seaice_parm01.addParm('HeffFile',HeffFile,PARM_STR);
     seaice_parm01.addParm('AreaFile',AreaFile,PARM_STR);
@@ -1275,8 +1276,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     'SIarea','SIheff','SIuice','SIvice' ...
       };
   numdiags_inst = length(diag_fields_inst);  
-%   diag_freq_inst = 1*t1year/12;
-  diag_freq_inst = 7*t1day;
+  diag_freq_inst = 1*t1year/12;
+%   diag_freq_inst = 7*t1day;
   diag_phase_inst = 0;
   
   for n=1:numdiags_inst    

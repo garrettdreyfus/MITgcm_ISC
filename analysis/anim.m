@@ -14,7 +14,7 @@ mac_plots = 0;
 loadexp;
 
 %%% Select diagnostic variable to animate
-diagnum = 4;
+diagnum = 8;
 outfname = diag_fileNames{1,diagnum};
 
 %%% Data index in the output data files
@@ -22,7 +22,7 @@ outfidx = 1;
 
 %%% If set true, plots a top-down view of the field in a given layer.
 %%% Otherwise plots a side-on view of the zonally-averaged field.
-xyplot = 0;
+xyplot = 1;
 
 %%% Vertical layer index to use for top-down plots
 xylayer = 1;
@@ -40,7 +40,7 @@ topplot = 0;
 midplot = 0;
 
 %%% Set true for a zonal average
-yzavg = 0;
+yzavg = 1;
 
 %%% Layer to plot in the y/z plane
 yzlayer = 80;
@@ -50,15 +50,16 @@ set_crange = 1;
 
 
 % crange = [-2.2 -1.6]; %/%% Filchner temp
-crange = [-3 1]; %%%temp
-% crange = [34.3 34.7]; %%% salinity
+% crange = [-3 1]; %%%temp
+% crange = [34.1 34.7]; %%% salinity
+% crange = [33.9 34.3]; %%% surface salinity
 % crange = [0 10]; %%%% for KPP hbl
 % crange = [0 1]; %%% For sea ice area
 % crange = [-.3 .3]; %%% For velocities or stresses
 % crange = [-1 1]*1e-4; %%% For freshwater fluxes
 % crange =[-100 100]; %%% Qnet
 % crange = [-300 300]; %%% swnet
-% crange = [0 3];
+crange = [0 3];
 % crange = [-0.01 0.01];
 
 % cmap = pmkmp(100,'Swtth');
@@ -80,22 +81,24 @@ nDumps = round(nTimeSteps*deltaT/dumpFreq);
 dumpIters = round((0:nDumps)*dumpFreq/deltaT);
 % dumpIters = dumpIters(dumpIters > nIter0);
 
+%%% Map of shallowest and deepest wet grid cells
+kmax = ones(Nx,Ny);
+kmin = ones(Nx,Ny);
+for i=1:Nx
+  for j=1:Ny
+    idx = find(squeeze(hFacC(i,j,:))>0);
+    if (~isempty(idx))
+      kmin(i,j) = min(idx);
+      kmax(i,j) = max(idx);
+    end
+  end
+end
+
 %%% Mesh grids for plotting
 if (xyplot)
 
   [YY,XX] = meshgrid(yy,xx);
-  if (botplot || topplot || midplot)  
-    kmax = ones(Nx,Ny);
-    kmin = ones(Nx,Ny);
-    for i=1:Nx
-      for j=1:Ny
-        idx = find(squeeze(hFacC(i,j,:))>0);
-        if (~isempty(idx))
-          kmin(i,j) = min(idx);
-          kmax(i,j) = max(idx);
-        end
-      end
-    end
+  if (botplot || topplot || midplot)      
     kn = ones(Nx,Ny);
     kp= ones(Nx,Ny);
     wn = 0.5*ones(Nx,Ny);
@@ -183,21 +186,25 @@ for n=1:length(dumpIters)
     Aprev = 0*A;
   end
   
-  if (n > 1)
-    ['diff = ',num2str(max(max(max(abs(A-Aprev)))))]
-  end
+%   if (n > 1)
+%     ['diff = ',num2str(max(max(max(abs(A-Aprev)))))]
+%   end
  
   tyears(n) = t;
   
-%   A(hFac==0) = NaN;
+
   
   
-  DX = repmat(delX',[1 Ny Nr]);
-  DY = repmat(delY,[Nx 1 Nr]);
-  DZ = repmat(reshape(delR,[1 1 Nr]),[Nx Ny 1]);  
-  Amean(n) = sum(sum(sum(A.*DX.*DY.*DZ.*hFacC)))/sum(sum(sum(DX.*DY.*DZ.*hFacC)))
+%   DX = repmat(delX',[1 Ny Nr]);
+%   DY = repmat(delY,[Nx 1 Nr]);
+%   DZ = repmat(reshape(delR,[1 1 Nr]),[Nx Ny 1]);  
+%   Amean(n) = sum(sum(sum(A.*DX.*DY.*DZ.*hFacC)))/sum(sum(sum(DX.*DY.*DZ.*hFacC)));
   
-  Axy = sum(A.*DY.*DZ.*hFacW,3);
+%   A(hFacC==0)   = NaN;
+  [nanmin(A(:)) nanmax(A(:))]
+  
+    
+%   Axy = sum(A.*DY.*DZ.*hFacW,3);
   
   %%% x/y plot
   if (xyplot)
