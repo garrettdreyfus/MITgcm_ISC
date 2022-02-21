@@ -11,7 +11,8 @@ expdir = basedir;
 % expname = 'test_for_Garrett';
 % expname = 'test_seaice';
 % expname = 'test_seaice_linwind';
-expname = 'test_seaice_V1';
+% expname = 'test_seaice_V1';
+expname = 'test_seaice_nowind_noPresReg';
 
 addpath ../newexp_ACC_AABW
 

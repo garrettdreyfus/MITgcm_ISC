@@ -871,8 +871,12 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %   SEAICE_frazilFrac       = 0.003;
     SEAICE_frazilFrac       = 0.01;
   %   SEAICE_frazilFrac       = 1.0; % frazil to sea ice conversion rate, as fraction (relative to the local freezing point of sea ice water)
-    SEAICEpressReplFac = 0; %%% 1 activates regularization of the pressure via the strain rate, 0 deactivates. Values between 0 and 1 are permitted.
-
+    SEAICEpressReplFac = 1; %%% 1 activates regularization of the pressure via the strain rate, 0 deactivates. Values between 0 and 1 are permitted.
+    SEAICEdiffKhHeff   = 25; %%% Horizontal diffusion rates for sea ice properties
+    SEAICEdiffKhArea   = 25;
+    SEAICEdiffKhSnow   = 25;
+    SEAICEdiffKhSalt   = 25;
+    
     %%% For initial conditions
     Ai0 = 1;
     Hi0 = 1;
@@ -943,6 +947,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     seaice_parm01.addParm('SEAICE_saltFrac',SEAICE_saltFrac,PARM_REAL);
     seaice_parm01.addParm('SEAICE_frazilFrac',SEAICE_frazilFrac,PARM_REAL);
     seaice_parm01.addParm('SEAICEpressReplFac',SEAICEpressReplFac,PARM_REAL);    
+    seaice_parm01.addParm('SEAICEdiffKhHeff',SEAICEdiffKhHeff,PARM_REAL);   
+    seaice_parm01.addParm('SEAICEdiffKhArea',SEAICEdiffKhArea,PARM_REAL);   
+    seaice_parm01.addParm('SEAICEdiffKhSnow',SEAICEdiffKhSnow,PARM_REAL);   
+    seaice_parm01.addParm('SEAICEdiffKhSalt',SEAICEdiffKhSalt,PARM_REAL);   
 
     seaice_parm01.addParm('HeffFile',HeffFile,PARM_STR);
     seaice_parm01.addParm('AreaFile',AreaFile,PARM_STR);
