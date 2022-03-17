@@ -1,4 +1,4 @@
-%%%
+% %%%
 %%% anim.m
 %%%
 %%% Reads diagnostic output from MITgcm and makes a movie of it. Requires
@@ -14,15 +14,15 @@ mac_plots = 0;
 loadexp;
 
 %%% Select diagnostic variable to animate
-diagnum = 4;
+diagnum = 8;
 outfname = diag_fileNames{1,diagnum};
 
 %%% Data index in the output data files
 outfidx = 1;
 
 %%% If set true, plots a top-down view of the field in a given layer.
-%%% Otherwise plots a side-on view of the zonally-averaged field.
-xyplot = 0;
+%%% Otherwise plots a side-on view of the zonally-averaged field
+xyplot = 1;
 
 %%% Vertical layer index to use for top-down plots
 xylayer = 1;
@@ -50,7 +50,7 @@ set_crange = 1;
 
 
 % crange = [-2.2 -1.6]; %/%% Filchner temp
-crange = [-3 1]; %%%temp
+% crange = [-2 1]; %%%temp
 % crange = [34.1 34.7]; %%% salinity
 % crange = [33.9 34.3]; %%% surface salinity
 % crange = [0 10]; %%%% for KPP hbl
@@ -59,7 +59,7 @@ crange = [-3 1]; %%%temp
 % crange = [-1 1]*1e-4; %%% For freshwater fluxes
 % crange =[-100 100]; %%% Qnet
 % crange = [-300 300]; %%% swnet
-% crange = [0 1]; %%% SI thickness
+crange = [0 1]; %%% SI thickness
 % crange = [-0.01 0.01];
 
 % cmap = pmkmp(100,'Swtth');
@@ -67,8 +67,8 @@ crange = [-3 1]; %%%temp
 % cmap = cmocean('thermal',100);
 % cmap = cmocean('ice',100);
 % cmap = haxby;
-% cmap = jet(200);
-cmap = redblue(100);
+cmap = jet(200);
+% cmap = redblue(100);
 
 % titlestr = 'Bottom salinity (g/kg)';
 % titlestr = 'Sea ice concentration';
@@ -126,21 +126,21 @@ else
   %%% Create mesh grid with vertical positions adjusted to sit on the bottom
   %%% topography and at the surface
   [ZZ,YY] = meshgrid(zz,yy);  
-  for j=1:Ny
-    if (yzavg)
-      hFacC_col = squeeze(hFacC(:,j,:));    
-      hFacC_col = max(hFacC_col,[],1);    
-    else
-      hFacC_col = squeeze(hFacC(yzlayer,j,:))';
-    end
-    zz_topface = zz(kmin(i,j))-(0.5-hFacC_col(kmin(i,j)))*delR(kmin(i,j));
-    zz_botface = zz(kmax(i,j))+(0.5-hFacC_col(kmax(i,j)))*delR(kmax(i,j));
-    ZZ(j,kmin(i,j)) = zz_topface;
-    if (kmax(i,j)>1)
-      ZZ(j,kmax(i,j)) = zz_botface;
-    end
-  end
-  
+%   for j=1:Ny
+%     if (yzavg)
+%       hFacC_col = squeeze(hFacC(:,j,:));    
+%       hFacC_col = max(hFacC_col,[],1);    
+%     else
+%       hFacC_col = squeeze(hFacC(yzlayer,j,:))';
+%     end
+%     zz_topface = zz(kmin(i,j))-(0.5-hFacC_col(kmin(i,j)))*delR(kmin(i,j));
+%     zz_botface = zz(kmax(i,j))+(0.5-hFacC_col(kmax(i,j)))*delR(kmax(i,j));
+%     ZZ(j,kmin(i,j)) = zz_topface;
+%     if (kmax(i,j)>1)
+%       ZZ(j,kmax(i,j)) = zz_botface;
+%     end
+%   end
+%   
 end
 
 %%% Plotting options
@@ -262,11 +262,11 @@ for n=1:length(dumpIters)
     end
     
     jrange = 1:Ny;
-    [C h] = contourf(YY(jrange,:),ZZ(jrange,:)/1000,Ayz(jrange,:),200,'EdgeColor','None');              
-%     pcolor(YY(jrange,:),ZZ(jrange,:)/1000,Ayz(jrange,:));
-%     shading interp;
+%     [C h] = contourf(YY(jrange,:),ZZ(jrange,:)/1000,Ayz(jrange,:),200,'EdgeColor','None');              
+    pcolor(YY(jrange,:),ZZ(jrange,:)/1000,Ayz(jrange,:));
+    shading interp;
     hold on;
-    [C,h]=contour(YY(jrange,:),ZZ(jrange,:)/1000,Ayz(jrange,:),10,'EdgeColor','k');
+%     [C,h]=contour(YY(jrange,:),ZZ(jrange,:)/1000,Ayz(jrange,:),10,'EdgeColor','k');
 %     [C,h]=contour(YY(jrange,:),ZZ(jrange,:)/1000,Ayz(jrange,:),[-2:0.5:12],'EdgeColor','k');
 %     [C,h]=contour(YY(jrange,:),ZZ(jrange,:)/1000,Ayz(jrange,:),[-0.1:0.005:0.1],'EdgeColor','k');
     if (yzavg)

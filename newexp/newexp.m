@@ -59,6 +59,35 @@
   %%% These parameters are most likely to vary between experiments
   %%% vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
   
+  
+  %%% Set-up for Ardbeg  
+%   opt_file = 'ardbeg_ucla'; %%% options file name
+%   use_mpi = true; %%% set true for parallel processing
+%   use_pbs = true; %%% set true for execution via PBS
+%   cluster = 'ardbeg';
+%   queue = 'all.q'; 
+%   sNx = 20; %%% no. of x-gridpoints per tile
+%   sNy = 25; %%% no. of y-gridpoints per tile
+%   nPx = 10; %%% no. of processors in x-direction
+%   nPy = 8; %%% no. of processors in y-direction
+%   Nr = 100; %%% no. of z-gridpoints
+
+  %%% Set-up for Hoffman2
+  opt_file = 'hoffman2_ucla'; %%% options file name
+  use_mpi = true; %%% set true for parallel processing
+  use_pbs = true; %%% set true for execution via PBS
+  cluster = 'hoffman2';
+  queue = 'all.q';
+  sNx = 20; %%% no. of x-gridpoints per tile
+  sNy = 25; %%% no. of y-gridpoints per tile
+  nPx = 10; %%% no. of processors in x-direction
+  nPy = 8; %%% no. of processors in y-direction
+  Nr = 100; %%% no. of z-gridpoints
+  
+  
+  %%% N.B. bverything in this section below this is old code, and will not
+  %%% work
+  
 %   %%% Set-up for Si's Mac Pro - barotropic test case
 %   opt_file = 'darwin_amd64_gfortran'; %%% options file name
 %   use_mpi = false; %%% set true for parallel processing
@@ -69,18 +98,7 @@
 %   nPx = 1; %%% no. of processors in x-direction
 %   nPy = 1; %%% no. of processors in y-direction
 %   Nr = 40; %%% no. of z-gridpoints
-  
-
-%   %%% Set-up for Hoffman2
-%   opt_file = 'hoffman2_ucla'; %%% options file name
-%   use_mpi = true; %%% set true for parallel processing
-%   use_pbs = true; %%% set true for execution via PBS
-%   cluster = 'hoffman2';
-%   queue = 'all.q';
-%   sNx = 50; %%% no. of x-gridpoints per tile
-%   sNy = 50; %%% no. of y-gridpoints per tile
-%   nPx = 8; %%% no. of processors in x-direction
-%   nPy = 9; %%% no. of processors in y-direction     
+    
   
 % %%% Set-up for Stampede2
 %   opt_file = 'xsede_stampede'; %%% options file name
@@ -129,18 +147,6 @@
 
  
 
-
-  %%% Set-up for Ardbeg  
-  opt_file = 'ardbeg_ucla'; %%% options file name
-  use_mpi = true; %%% set true for parallel processing
-  use_pbs = true; %%% set true for execution via PBS
-  cluster = 'ardbeg';
-  queue = 'all.q'; 
-  sNx = 20; %%% no. of x-gridpoints per tile
-  sNy = 25; %%% no. of y-gridpoints per tile
-  nPx = 10; %%% no. of processors in x-direction
-  nPy = 8; %%% no. of processors in y-direction
-  Nr = 100; %%% no. of z-gridpoints
 
 
 
@@ -194,10 +200,10 @@
       
     case 'hoffman2'
         
-      username = 'csi';
+      username = 'andrewst';
       clustername = 'hoffman2.idre.ucla.edu';
-      toolsdir = '/u/scratch/c/csi/MITgcm_ASF-csi/tools/';
-      clusterdir = ['/u/scratch/c/csi/MITgcm_ASF-csi/',batch_name];
+      toolsdir = '/u/scratch/a/andrewst/MITgcm_ISC/tools/';
+      clusterdir = ['/u/scratch/a/andrewst/MITgcm_ISC/experiments/',batch_name];
       
     otherwise %%% Defaults to 'none'
        
@@ -304,8 +310,7 @@
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   
   %%% Computation time (in hours) per gridpoint (in space and time) 
-  %%% assigned to each processor.
-  %%% Estimated for a single Fram core.
+  %%% assigned to each processor.  
   switch (cluster)
     case 'gordon'
       alpha = 0.63e-9;
@@ -316,7 +321,7 @@
     case 'hoffman2'
       alpha = 0.63e-9;
     otherwise %%% Defaults to Ardbeg
-      alpha = 0.63e-9;
+      alpha = 0.5e-9;
   end  
   
   %%% Estimated total computation time in hours (assumes one tile per

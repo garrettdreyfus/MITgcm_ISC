@@ -125,10 +125,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   swdown0 = 0; %%% Based on AMPS, typical summer value = 300, typical winter value = 0
   precip0 = 0;
   runoff0 = 0;
-%   Ua = -6; %%% Zonal wind speed
+  Ua = -6; %%% Zonal wind speed
 %   Va = 4; %%% Meridional wind speed
-  Ua = 0; %%% Zonal wind speed
-  Va = 0; %%% Meridional wind speed
+%   Ua = 0; %%% Zonal wind speed
+  Va = 3; %%% Meridional wind speed
   
   %%% Package options
   useSEAICE = true;
@@ -1284,7 +1284,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     'SIarea','SIheff','SIuice','SIvice' ...
       };
   numdiags_inst = length(diag_fields_inst);  
-  diag_freq_inst = 1*t1year/12;
+  diag_freq_inst = 1*t1year;
 %   diag_freq_inst = 7*t1day;
   diag_phase_inst = 0;
   
