@@ -872,10 +872,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     SEAICE_frazilFrac       = 0.01;
   %   SEAICE_frazilFrac       = 1.0; % frazil to sea ice conversion rate, as fraction (relative to the local freezing point of sea ice water)
     SEAICEpressReplFac = 1; %%% 1 activates regularization of the pressure via the strain rate, 0 deactivates. Values between 0 and 1 are permitted.
-    SEAICEdiffKhHeff   = 25; %%% Horizontal diffusion rates for sea ice properties
-    SEAICEdiffKhArea   = 25;
-    SEAICEdiffKhSnow   = 25;
-    SEAICEdiffKhSalt   = 25;
+    SEAICEdiffKhHeff   = 25*(mean(dx,dy)/2000)^2; %%% Horizontal diffusion rates for sea ice properties
+    SEAICEdiffKhArea   = 25*(mean(dx,dy)/2000)^2;
+    SEAICEdiffKhSnow   = 25*(mean(dx,dy)/2000)^2;
+    SEAICEdiffKhSalt   = 25*(mean(dx,dy)/2000)^2;
     
     %%% For initial conditions
     Ai0 = 1;
