@@ -66,7 +66,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
 %   simTime = 60*t1day;
   nIter0 = 0; %%% Initial iteration 
   Lx = 400*m1km; %%% Domain size in x 
-  Ly = 400*m1km; %%% Domain size in y   
+  Ly = 300*m1km; %%% Domain size in y   
 %   Ls = 50*m1km; %%% Width of southern boundary region
   Ln = 20*m1km; %%% Width of northern boundary region
   H = 4000; %%% Domain size in z 
@@ -1185,37 +1185,42 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   % 
 
     relaxmask = zeros(Nx,Ny,Nr);
-    relaxmask(:,:,1) = 1;
-
-    ##### TEMPERATURE SETTINGS ###########
+    %%relaxmask(:,:,1) = 1;
+    iceidx = find(Y<=Yicefront+10000 & Yicefront<Y & (X<Xtrough+(Xeast-Xwest)/2) & (X>=Xtrough-(Xeast-Xwest)/2));  
+    relaxmask(iceidx) = 1;
+    if(showplots)
+      pcolor(X,Y,relaxmask(:,:,1));
+      shading interp;
+      title("RBCS area");
+    end
+    relaxmaskFile = 'relaxmask.bin';
+    %%%%% TEMPERATURE SETTINGS %%%%%%%%%%%%%5
     useRBCtemp = true;
     tauRelaxT = t1day/4.0;
     %%% For initial conditions
     trelaxvalsFile = 'trelaxvals.bin';
-    trelaxmaskFile = 'trelaxmask.bin';
     %%% Align initial temp with background
     trelaxvals = zeros(Nx,Ny,Nr);
-    trelaxvals(relaxmask) = -1.86
+    trelaxvals(relaxmask==1) = -1.86;
 
     writeDataset(trelaxvals,fullfile(inputpath,trelaxvalsFile),ieee,prec); 
 
-    ##### SALINITY SETTINGS ###########
+    %%%%%%%%%%%%% SALINITY SETTINGS %%%%%%%%%%%%%%%%5
     useRBCsalt = true;
     tauRelaxS = t1day/4.0;
     %%% For initial conditions
-    trelaxvalsFile = 'srelaxvals.bin';
-    trelaxmaskFile = 'srelaxmask.bin';
+    srelaxvalsFile = 'srelaxvals.bin';
     %%% Align initial temp with background
     srelaxvals = zeros(Nx,Ny,Nr);
 
-    srelaxvals(relaxmask) = 34.8
+    srelaxvals(relaxmask==1) = 34.8;
 
     writeDataset(srelaxvals,fullfile(inputpath,srelaxvalsFile),ieee,prec); 
 
-    ######################################3
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-    writeDataset(relaxmask,fullfile(inputpath,trelaxmaskFile),ieee,prec); 
+    writeDataset(relaxmask,fullfile(inputpath,relaxmaskFile),ieee,prec); 
 
     rbcs_parm01.addParm('useRBCtemp',useRBCtemp,PARM_BOOL)
     rbcs_parm01.addParm('useRBCsalt',useRBCsalt,PARM_BOOL)
@@ -1631,7 +1636,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%% Creates a matlab file defining all input parameters
   write_matlab_params(inputpath,ALL_PARMS,realfmt);
   
-  
+  save(fullfile(inputpath,'metaparameters.mat'))
+
 end
 
 
