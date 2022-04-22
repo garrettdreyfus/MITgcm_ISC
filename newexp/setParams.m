@@ -7,8 +7,8 @@
 function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
 
   %%% Load EOS utilities
-  addpath ~/UCLA/Utilities/GSW/
-  addpath ~/UCLA/Utilities/GSW/library/
+  addpath ~/Documents/GSW/
+  addpath ~/Documents/GSW/library/
   
   %%% Other required tools
   addpath ../utils/matlab;
@@ -44,7 +44,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   parm05 = parmlist;
   PARM={parm01,parm02,parm03,parm04,parm05}; 
   
-  %%% Seconds in one hour
+  %%% Seconds in one minute
   t1min = 60;
   %%% Seconds in one hour
   t1hour = 60*t1min;
@@ -100,7 +100,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   
   %%% Topographic parameters 
   Wslope = 30*m1km; %%% Continental slope half-width
-  Hshelf = 500; %%% Continental shelf depth
+  Hshelf = 800; %%% Continental shelf depth
   Wshelf = 50*m1km; %%% Width of continental shelf
   Ycoast = 200*m1km; %%% Latitude of coastline
   Wcoast = 20*m1km; %%% Width of coastal wall slope
@@ -131,10 +131,11 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   Va = 3; %%% Meridional wind speed
   
   %%% Package options
-  useSEAICE = true;
+  useSEAICE = false;
   useSHELFICE = true;     
-  useLAYERS = false;      
+  useLAYERS = true;      
   useEXF = useSEAICE;  
+  useRBCS = true;  
   
   %%% OBCS package options
   useOBCS = true;    
@@ -458,7 +459,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   s_surf = 34.15;
   pt_surf = -1.8;
   Zsml = -50;
-  Zcdw_pt = -300;
+  Zcdw_pt = -1500;
   Zcdw_s = Zcdw_pt - 100; %%% This is important - salinity maximum needs to 
                           %%% be deeper or else you end up with very weak 
                           %%% buoyancy frequency just below the pycnocline
@@ -872,10 +873,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     SEAICE_frazilFrac       = 0.01;
   %   SEAICE_frazilFrac       = 1.0; % frazil to sea ice conversion rate, as fraction (relative to the local freezing point of sea ice water)
     SEAICEpressReplFac = 1; %%% 1 activates regularization of the pressure via the strain rate, 0 deactivates. Values between 0 and 1 are permitted.
-    SEAICEdiffKhHeff   = 25*(mean(dx,dy)/2000)^2; %%% Horizontal diffusion rates for sea ice properties
-    SEAICEdiffKhArea   = 25*(mean(dx,dy)/2000)^2;
-    SEAICEdiffKhSnow   = 25*(mean(dx,dy)/2000)^2;
-    SEAICEdiffKhSalt   = 25*(mean(dx,dy)/2000)^2;
+    SEAICEdiffKhHeff   = 25*(mean([dx,dy])/2000)^2; %%% Horizontal diffusion rates for sea ice properties
+    SEAICEdiffKhArea   = 25*(mean([dx,dy])/2000)^2;
+    SEAICEdiffKhSnow   = 25*(mean([dx,dy])/2000)^2;
+    SEAICEdiffKhSalt   = 25*(mean([dx,dy])/2000)^2;
     
     %%% For initial conditions
     Ai0 = 1;
@@ -1128,29 +1129,36 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     %%% Define parameters for layers package %%%
 
     %%% Number of fields for which to calculate layer fluxes  
-    layers_maxNum = 1;
+    layers_maxNum = 2;
 
     %%% Specify potential density
-    layers_name = char('RHO'); 
+    layers_name = char('RHO','TH'); 
 
-    layers_bounds = [0 35 ...
+    layers_bounds(:,1) = [0 35 ...
            35.8:0.05:36.3 ...
            36.4 36.54:0.02:36.66 ...
            36.7 36.73 36.76 36.8:0.1:37.1 ...
            37.13:0.02:37.17 37.18:0.004:37.206 ...
            37.21:0.003:37.3 37.5 40]; 
+    layers_bounds(:,2) = [-10 -1.88:0.01:-1.78 -1.76:0.05:-1.2 -1.18:0.02:-1.16 -1.144:0.002:-1.18 -1.15:0.05:1 10];
 
 
     %%% Reference level for calculation of potential density  
-    layers_krho = 51; % High-resolution zz (51)=-1.9943e+03 m;
+    layers_krho = [51 1]; % High-resolution zz (51)=-1.9943e+03 m;
 
     %%% If set true, the GM bolus velocity is added to the calculation
     layers_bolus = false;  
 
+    for nl=1:layers_maxNum    
+      layers_parm01.addParm(['layers_name(' num2str(nl) ')'],strtrim(layers_name(nl,:)),PARM_STR); 
+      layers_parm01.addParm(['layers_krho(' num2str(nl) ')'],layers_krho(nl),PARM_INT); 
+      layers_parm01.addParm(['layers_bounds(:,' num2str(nl) ')'],layers_bounds(:,nl),PARM_REALS); 
+    end
     %%% Layers
-    layers_parm01.addParm(['layers_bounds'],layers_bounds,PARM_REALS); 
-    layers_parm01.addParm(['layers_krho'],layers_krho,PARM_INT); 
-    layers_parm01.addParm(['layers_name'],strtrim(layers_name),PARM_STR); 
+    %% layers_parm01.addParm(['layers_bounds'],layers_bounds,PARM_REALS); 
+    %% layers_parm01.addParm(['layers_krho'],layers_krho,PARM_INT); 
+    %% layers_parm01.addParm(['layers_name'],strtrim(layers_name),PARM_STR);
+    
     layers_parm01.addParm('layers_bolus',layers_bolus,PARM_BOOL); 
 
     %%z% Create the data.layers file
@@ -1159,6 +1167,69 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     %%% Create the LAYERS_SIZE.h file
     createLAYERSSIZEh(codepath,length(layers_bounds)-1,layers_maxNum); 
 
+  end
+  
+  
+  %%%%%%%%%%%%%%%%%%
+  %%%%%%%%%%%%%%%%%%
+  %%%%%%RBCS PKG%%%%%
+  %%%%%%%%%%%%%%%%%%
+  %%%%%%%%%%%%%%%%%%
+  if (useRBCS)
+    % to store parameter names and values
+    rbcs_parm01 = parmlist;
+    rbcs_parm02 = parmlist;
+    RBCS_PARM = {rbcs_parm01,rbcs_parm01};
+
+  % Oringinal albedos from llc_1/48th  other values from llc_2160
+  % 
+
+    relaxmask = zeros(Nx,Ny,Nr);
+    relaxmask(:,:,1) = 1;
+
+    ##### TEMPERATURE SETTINGS ###########
+    useRBCtemp = true;
+    tauRelaxT = t1day/4.0;
+    %%% For initial conditions
+    trelaxvalsFile = 'trelaxvals.bin';
+    trelaxmaskFile = 'trelaxmask.bin';
+    %%% Align initial temp with background
+    trelaxvals = zeros(Nx,Ny,Nr);
+    trelaxvals(relaxmask) = -1.86
+
+    writeDataset(trelaxvals,fullfile(inputpath,trelaxvalsFile),ieee,prec); 
+
+    ##### SALINITY SETTINGS ###########
+    useRBCsalt = true;
+    tauRelaxS = t1day/4.0;
+    %%% For initial conditions
+    trelaxvalsFile = 'srelaxvals.bin';
+    trelaxmaskFile = 'srelaxmask.bin';
+    %%% Align initial temp with background
+    srelaxvals = zeros(Nx,Ny,Nr);
+
+    srelaxvals(relaxmask) = 34.8
+
+    writeDataset(srelaxvals,fullfile(inputpath,srelaxvalsFile),ieee,prec); 
+
+    ######################################3
+
+
+    writeDataset(relaxmask,fullfile(inputpath,trelaxmaskFile),ieee,prec); 
+
+    rbcs_parm01.addParm('useRBCtemp',useRBCtemp,PARM_BOOL)
+    rbcs_parm01.addParm('useRBCsalt',useRBCsalt,PARM_BOOL)
+    rbcs_parm01.addParm('tauRelaxT',tauRelaxT,PARM_REAL)
+    rbcs_parm01.addParm('tauRelaxS',tauRelaxS,PARM_REAL)
+    rbcs_parm01.addParm('relaxMaskFile',relaxmaskFile,PARM_STR)
+    rbcs_parm01.addParm('relaxTFile',trelaxvalsFile,PARM_STR)
+    rbcs_parm01.addParm('relaxSFile',srelaxvalsFile,PARM_STR)
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%% WRITE THE 'data.seaice' FILE %%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    write_data_seaice(inputpath,RBCS_PARM,listterm,realfmt);  
+    
   end
   
   
@@ -1213,7 +1284,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
 
 
   %%% Annual mean diagnostics
-  diag_fields_avg = {...   
+  diag_fields_avg = {'SHIfwFlx','SALT','THETA','momKE','RHOAnoma','LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO','VVEL','PHIHYD'};
   % % %      'UVEL','VVEL','WVEL','SALT','THETA','PHIHYD','ETAN',...%%% Basic state 
   % % %      'TOTTTEND','TFLUX','ADVy_TH','VVELTH','oceQnet',...%%% Heat budget
   % % %      'UVELSQ','VVELSQ','WVELSQ','UV_VEL_Z','WU_VEL','WV_VEL',...%%% Energy budget
@@ -1251,15 +1322,11 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   % % % % % %          'ETAN',...
   % % % % % %          'oceTAUX','oceTAUY',...
   % % % % % %      ... %%% Overturning streamfunction
-  % % % % % %          'RHOAnoma','LaUH1RHO','LaHw1RHO','LaTr1RHO',... 
-  % % % % % %                     'LaUH2TH','LaHw2TH',... 
   % % % % % %      ...
   % % % % % %          'Um_Diss','Um_Advec','Um_dPhiX','Um_Ext',...
   % % % % % %          'SItaux','SItauy','SIatmTx','SIatmTy',...   
   % % % % % %          'Vm_Diss','Vm_Advec','Vm_Cori','Vm_dPhiY','Vm_Ext','Vm_AdvZ3','Vm_AdvRe',...
   % % % % % %          'VISrI_Um','VISrI_Vm',...
-     };
-      
   numdiags_avg = length(diag_fields_avg);  
   diag_freq_avg = 1*t1year;
 
@@ -1279,10 +1346,14 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   
   
   %%%%%% Daily output 
+  %% diag_fields_inst = {...
+  %%   'UVEL','VVEL','WVEL','THETA','SALT','ETAN', ...
+  %%   'SIarea','SIheff','SIuice','SIvice' ...
+  %%     };
   diag_fields_inst = {...
-    'UVEL','VVEL','WVEL','THETA','SALT','ETAN', ...
-    'SIarea','SIheff','SIuice','SIvice' ...
-      };
+    'UVEL','VVEL','WVEL','THETA','SALT','ETAN'};
+
+
   numdiags_inst = length(diag_fields_inst);  
   diag_freq_inst = 1*t1year;
 %   diag_freq_inst = 7*t1day;

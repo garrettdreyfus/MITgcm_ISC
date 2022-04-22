@@ -31,7 +31,7 @@
   
   
   %%% Local directory in which to create experiments
-  runsdir = '/Volumes/Kilchoman/UCLA/Projects/MITgcm_ISC/';
+  runsdir = '~/Projects/MITgcm_ISC/';
  
   %%% Experiment subdirectories 
   builddir = 'build';
@@ -79,9 +79,11 @@
   cluster = 'hoffman2';
   queue = 'all.q';
   sNx = 20; %%% no. of x-gridpoints per tile
-  sNy = 25; %%% no. of y-gridpoints per tile
-  nPx = 10; %%% no. of processors in x-direction
-  nPy = 8; %%% no. of processors in y-direction
+  sNy = 20; %%% no. of y-gridpoints per tile
+
+  nPx = 5; %%% no. of processors in x-direction
+  nPy = 5; %%% no. of processors in y-direction
+
   Nr = 100; %%% no. of z-gridpoints
   
   
@@ -200,10 +202,10 @@
       
     case 'hoffman2'
         
-      username = 'andrewst';
+      username = 'gdf';
       clustername = 'hoffman2.idre.ucla.edu';
-      toolsdir = '/u/scratch/a/andrewst/MITgcm_ISC/tools/';
-      clusterdir = ['/u/scratch/a/andrewst/MITgcm_ISC/experiments/',batch_name];
+      toolsdir = '/u/scratch/g/gdf/MITgcm_ISC/tools/';
+      clusterdir = ['/u/scratch/g/gdf/MITgcm_ISC/experiments/',batch_name];
       
     otherwise %%% Defaults to 'none'
        
@@ -228,6 +230,7 @@
   codepath =  fullfile(exppath,codedir);
   inputpath = fullfile(exppath,inputdir);
   resultspath = fullfile(exppath,resultsdir);
+
   
   %%% We have to use MPI if we're using PBS
   if (use_pbs)
@@ -242,7 +245,7 @@
   %%% Calculate total grid size and number of nodes
   Nx = sNx*nSx*nPx;
   Ny = sNy*nSy*nPy;
-  nodes = nPx*nPy;
+  nodes = nPx*nPy
 
 
 
@@ -390,6 +393,7 @@
         createPBSfile_Comet(resultspath,exp_name,nodes,2*comptime,acct,fullfile(clusterdir,exp_name,resultsdir));        
         runcommands = [runcommands,'sbatch run_mitgcm_comet',lf];
       case 'hoffman2'
+	display(resultspath);
         createPBSfile_Hoffman(resultspath,exp_name,nodes);        
         runcommands = [runcommands,'qsub run_mitgcm > output.txt',lf];
       otherwise %%% Defaults to Ardbeg
