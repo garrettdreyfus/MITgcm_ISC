@@ -57,14 +57,14 @@ def crossSectionAnim(fname,description,times=np.array([]),quant="THETA"):
     fig,ax1 = plt.subplots()
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
-    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-    zonal_average = ds.mean(dim="XC")
-    bottomMask(ds)
+    print(times)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=list(times))
+    ds[quant].values=ds[quant].values*ds.hFacC.values
+    zonal_average = ds.where(ds.hFacC == 1).mean(dim="XC",skipna=True)
     #zonal_average = ds.isel(XC=32)
     moviewriter = FFMpegFileWriter(fps=1)
     tmin, tmax = np.nanmin(zonal_average[quant]), np.nanmax(zonal_average[quant])
     with moviewriter.saving(fig, 'myfile.mp4', dpi=250):
-        print("writing movie")
         for k in tqdm(range(zonal_average.THETA.shape[0])):
             frame = ax1.pcolormesh(zonal_average.YC.values,zonal_average.Z.values,zonal_average[quant][k,:,:],cmap="jet",vmin=tmin,vmax=tmax)
             cb = plt.colorbar(frame)
@@ -84,7 +84,7 @@ def bottomAnim(fname,description,times=np.array([]),quant="THETA"):
     tmin, tmax = np.nanmin(ds[quant]), np.nanmax(ds[quant])
     with moviewriter.saving(fig, 'myfile.mp4', dpi=250):
         print("writing movie")
-        for k in tqdm(range(ds[quant].shape[0])):
+        for k in tqdm([0]+list(range(ds[quant].shape[0]))+[-1]):
             frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,ds[quant].values[k][bmask],cmap="jet",vmin=tmin,vmax=tmax)
             cb = plt.colorbar(frame)
             moviewriter.grab_frame()
@@ -102,7 +102,8 @@ def getIterNums(fpath):
         if 'SALT' in fname and "inst" not in fname:
             n = int(fname.split(".")[1])
             saltiters.append(n)
-    return np.unique(np.asarray(np.intersect1d(iters,saltiters)[:-1]))
+    print(iters,saltiters)
+    return np.unique(np.asarray(np.intersect1d(iters,saltiters)[:]))
 
 #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish/test/results","Restricted y domain length with default settings",times = np.asarray(range(1,9))*420480)
 # fig,axises = plt.subplots(2,2)
@@ -110,6 +111,6 @@ def getIterNums(fpath):
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/above/results","above",fig,axises)
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","at",fig,axises)
 # plt.show()
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","Restricted y domain length with default settings")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","Restricted y domain length with default settings")
+bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","Restricted y domain length with default settings")
 #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Lower thermocline 4km resolution")
