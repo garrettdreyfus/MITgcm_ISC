@@ -64,8 +64,8 @@ def crossSectionAnim(fname,description,times=np.array([]),quant="THETA"):
     times=getIterNums(fname)
     print(times)
     ds = open_mdsdataset(fname,prefix="THETA",ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-    zonal_average = ds.mean(dim="XC")
-    bottomMask(ds)
+    ds[quant].values=ds[quant].values*ds.hFacC.values
+    zonal_average = ds.where(ds.hFacC == 1).mean(dim="XC",skipna=True)
     #zonal_average = ds.isel(XC=32)
     moviewriter = FFMpegFileWriter(fps=1)
     tmin, tmax = np.nanmin(zonal_average[quant]), np.nanmax(zonal_average[quant])
@@ -93,7 +93,7 @@ def bottomAnim(fname,description,times=np.array([]),quant="THETA"):
     tmin, tmax = np.nanmin(ds[quant]), np.nanmax(ds[quant])
     with moviewriter.saving(fig, 'myfile.mp4', dpi=250):
         print("writing movie")
-        for k in tqdm(range(ds[quant].shape[0])):
+        for k in tqdm([0]+list(range(ds[quant].shape[0]))+[-1]):
             frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,ds[quant].values[k][bmask],cmap="jet",vmin=tmin,vmax=tmax)
             cb = plt.colorbar(frame)
             moviewriter.grab_frame()
