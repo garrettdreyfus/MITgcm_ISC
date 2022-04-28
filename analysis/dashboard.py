@@ -52,18 +52,27 @@ def bottomMask(ds):
         bmask[nanmask] = full_mask[nanmask]
     return bmask
     
+def outPath(resultspath):
+    nameparts = resultspath.split("/")
+    shortname = nameparts[-3] + "|" + nameparts[-2]
+    fpath = "/".join((nameparts[:-4]+["pics"] + [shortname]))
+    return shortname, fpath
 
 def crossSectionAnim(fname,description,times=np.array([]),quant="THETA"):
     fig,ax1 = plt.subplots()
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
-    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    print(times)
+    ds = open_mdsdataset(fname,prefix="THETA",ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
     zonal_average = ds.mean(dim="XC")
     bottomMask(ds)
     #zonal_average = ds.isel(XC=32)
     moviewriter = FFMpegFileWriter(fps=1)
     tmin, tmax = np.nanmin(zonal_average[quant]), np.nanmax(zonal_average[quant])
-    with moviewriter.saving(fig, 'myfile.mp4', dpi=250):
+    shortname, fpath = outPath(fname) 
+    print(shortname,fpath)
+    fig.suptitle(shortname)
+    with moviewriter.saving(fig, fpath+".mp4" , dpi=250):
         print("writing movie")
         for k in tqdm(range(zonal_average.THETA.shape[0])):
             frame = ax1.pcolormesh(zonal_average.YC.values,zonal_average.Z.values,zonal_average[quant][k,:,:],cmap="jet",vmin=tmin,vmax=tmax)
@@ -102,7 +111,7 @@ def getIterNums(fpath):
         if 'SALT' in fname and "inst" not in fname:
             n = int(fname.split(".")[1])
             saltiters.append(n)
-    return np.unique(np.asarray(np.intersect1d(iters,saltiters)[:-1]))
+    return np.unique(np.asarray(np.intersect1d(iters,saltiters)))
 
 #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish/test/results","Restricted y domain length with default settings",times = np.asarray(range(1,9))*420480)
 # fig,axises = plt.subplots(2,2)
@@ -110,6 +119,18 @@ def getIterNums(fpath):
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/above/results","above",fig,axises)
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","at",fig,axises)
 # plt.show()
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","Restricted y domain length with default settings")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/fully/under/results","Restricted y domain length with default settings")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-test/above/results","Restricted y domain length with default settings")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","Restricted y domain length with default settings")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/at/results","Restricted y domain length with default settings")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","Restricted y domain length with default settings")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/above/results","Restricted y domain length with default settings")
 crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","Restricted y domain length with default settings")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings")
+
+#fig,axises = plt.subplots(2,2)
+#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","under",fig,axises)
+#plt.show()
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings")
 #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Lower thermocline 4km resolution")
