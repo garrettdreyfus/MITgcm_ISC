@@ -63,7 +63,7 @@ def crossSectionAnim(fname,description,times=np.array([]),quant="THETA"):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     print(times)
-    ds = open_mdsdataset(fname,prefix="THETA",ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    ds = open_mdsdataset(fname,prefix=quant,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
     ds[quant].values=ds[quant].values*ds.hFacC.values
     zonal_average = ds.where(ds.hFacC == 1).mean(dim="XC",skipna=True)
     #zonal_average = ds.isel(XC=32)
@@ -74,7 +74,7 @@ def crossSectionAnim(fname,description,times=np.array([]),quant="THETA"):
     fig.suptitle(shortname)
     with moviewriter.saving(fig, fpath+".mp4" , dpi=250):
         print("writing movie")
-        for k in tqdm(range(zonal_average.THETA.shape[0])):
+        for k in tqdm(range(zonal_average[quant].shape[0])):
             frame = ax1.pcolormesh(zonal_average.YC.values,zonal_average.Z.values,zonal_average[quant][k,:,:],cmap="jet",vmin=tmin,vmax=tmax)
             cb = plt.colorbar(frame)
             moviewriter.grab_frame()
@@ -86,15 +86,20 @@ def bottomAnim(fname,description,times=np.array([]),quant="THETA"):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-    bmask = bottomMask(ds)
-
+    z = np.concatenate((ds.hFacC.values[:-1,:,:]-ds.hFacC.values[1:,:,:],ds.hFacC[-1:,:,:]),axis=0)
+    z[z<0]=0
+    z[-1,:,:]=0
+    zmask = z
     #zonal_average = ds.isel(XC=32)
     moviewriter = FFMpegFileWriter(fps=1)
     tmin, tmax = np.nanmin(ds[quant]), np.nanmax(ds[quant])
-    with moviewriter.saving(fig, 'myfile.mp4', dpi=250):
+    shortname, fpath = outPath(fname) 
+    with moviewriter.saving(fig, fpath+"-bot.mp4", dpi=250):
         print("writing movie")
         for k in tqdm([0]+list(range(ds[quant].shape[0]))+[-1]):
-            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,ds[quant].values[k][bmask],cmap="jet",vmin=tmin,vmax=tmax)
+            znew = np.multiply(zmask,ds[quant].values[k])
+            znew = np.sum(znew,axis=0)
+            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet",vmin=-2,vmax=1)
             cb = plt.colorbar(frame)
             moviewriter.grab_frame()
             cb.remove()
@@ -119,18 +124,20 @@ def getIterNums(fpath):
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/above/results","above",fig,axises)
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","at",fig,axises)
 # plt.show()
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","Restricted y domain length with default settings")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/fully/under/results","Restricted y domain length with default settings")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-test/above/results","Restricted y domain length with default settings")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","Restricted y domain length with default settings")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/at/results","Restricted y domain length with default settings")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","Restricted y domain length with default settings")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/above/results","Restricted y domain length with default settings")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","Restricted y domain length with default settings")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","Restricted y domain length with default settings")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/fully/under/results","Restricted y domain length with default settings")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-test/at/results","Restricted y domain length with default settings")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","Restricted y domain length with default settings",quant="SALT")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/at/results","Restricted y domain length with default settings",quant="SALT")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","Restricted y domain length with default settings",quant="SALT")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/above/results","Restricted y domain length with default settings")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","Restricted y domain length with default settings")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings")
 
-#fig,axises = plt.subplots(2,2)
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","under",fig,axises)
-#plt.show()
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings")
+# fig,axises = plt.subplots(2,2)
+# timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","under",fig,axises)
+# plt.show()
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish_polyna/under/results","Restricted y domain length with default settings")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish_polyna/at/results","Restricted y domain length with default settings")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish_polyna/above/results","Restricted y domain length with default settings")
 #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Lower thermocline 4km resolution")
