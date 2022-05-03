@@ -78,11 +78,11 @@
   use_pbs = true; %%% set true for execution via PBS
   cluster = 'hoffman2';
   queue = 'all.q';
-  sNx = 20; %%% no. of x-gridpoints per tile
-  sNy = 20; %%% no. of y-gridpoints per tile
+  sNx = 10; %%% no. of x-gridpoints per tile
+  sNy = 13; %%% no. of y-gridpoints per tile
 
-  nPx = 5; %%% no. of processors in x-direction
-  nPy = 5; %%% no. of processors in y-direction
+  nPx = 10; %%% no. of processors in x-direction
+  nPy = 6; %%% no. of processors in y-direction
 
   Nr = 100; %%% no. of z-gridpoints
   
@@ -205,7 +205,7 @@
       username = 'gdf';
       clustername = 'hoffman2.idre.ucla.edu';
       toolsdir = '/u/scratch/g/gdf/MITgcm_ISC/tools/';
-      clusterdir = ['/u/scratch/g/gdf/MITgcm_ISC/experiments/',batch_name];
+      clusterdir = ['/u/scratch/g/gdf/MITgcm_ISC/',batch_name];
       
     otherwise %%% Defaults to 'none'
        

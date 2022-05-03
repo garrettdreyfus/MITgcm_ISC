@@ -69,7 +69,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   Ly = 300*m1km; %%% Domain size in y   
 %   Ls = 50*m1km; %%% Width of southern boundary region
   Ln = 20*m1km; %%% Width of northern boundary region
-  H = 4000; %%% Domain size in z 
+  H = 2500; %%% Domain size in z 
   g = 9.81; %%% Gravity  
   f0 = -1.3e-4; %%% Coriolis parameter
   beta = 1e-11; %%% Beta parameter      
@@ -135,12 +135,13 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   useSHELFICE = true;     
   useLAYERS = true;      
   useEXF = useSEAICE;  
-  useRBCS = true;  
+  useRBCS = false;  
   
   %%% OBCS package options
   useOBCS = true;    
   useOBCSbalance = true;  
   useOrlanskiNorth = false;
+  useOrlanskiEW = true;
   
   
   %%% PARM01
@@ -459,7 +460,11 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   s_surf = 34.15;
   pt_surf = -1.8;
   Zsml = -50;
-  Zcdw_pt = -1500;
+  % above -600
+  % at -1000
+  % at -1500
+  
+  Zcdw_pt = -1000;
   Zcdw_s = Zcdw_pt - 100; %%% This is important - salinity maximum needs to 
                           %%% be deeper or else you end up with very weak 
                           %%% buoyancy frequency just below the pycnocline
@@ -479,8 +484,9 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
    
   
   %%% Artificially construct a hydrographic profile
-  depth_North_pt = [-H (-H+3*Zcdw_pt)/4 Zcdw_pt Zsml 0];
-  depth_North_s = [-H (-H+3*Zcdw_s)/4 Zcdw_s Zsml 0];
+  H_hydro=4000
+  depth_North_pt = [-H_hydro (-H_hydro+3*Zcdw_pt)/4 Zcdw_pt Zsml 0];
+  depth_North_s = [-H_hydro (-H_hydro+3*Zcdw_s)/4 Zcdw_s Zsml 0];
   ptemp_North = [pt_bot (pt_bot+pt_mid)/2 pt_mid pt_surf pt_surf];
   salt_North = [s_bot (s_bot+s_mid)/2 s_mid s_surf s_surf];
  
@@ -1196,7 +1202,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     relaxmaskFile = 'relaxmask.bin';
     %%%%% TEMPERATURE SETTINGS %%%%%%%%%%%%%5
     useRBCtemp = true;
-    tauRelaxT = t1day/4.0;
+    tauRelaxT = t1day;
     %%% For initial conditions
     trelaxvalsFile = 'trelaxvals.bin';
     %%% Align initial temp with background
@@ -1233,7 +1239,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%% WRITE THE 'data.seaice' FILE %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    write_data_seaice(inputpath,RBCS_PARM,listterm,realfmt);  
+    write_data_rbcs(inputpath,RBCS_PARM,listterm,realfmt);  
     
   end
   
@@ -1446,17 +1452,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%% Enables/disables sponge layers   
   useOBCSsponge = true;
   obcs_parm01.addParm('useOBCSsponge',useOBCSsponge,PARM_BOOL);
-    
-  if (useSEAICE)
-    useSeaiceSponge = true;
-    obcs_parm01.addParm('useSeaiceSponge',useSeaiceSponge,PARM_BOOL);
-  else 
-    useSeaiceSponge = false;
-  end
-  
-  %%% Set boundary velocities and temperatures
-  useOBCSprescribe = true;  
-  
+      
   %%% Set northern boundary properties
   OBNt = ones(Nx,1)*tNorth;
   OBNs = ones(Nx,1)*sNorth;  
@@ -1466,10 +1462,66 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   writeDataset(OBNs,fullfile(inputpath,'OBNsFile.bin'),ieee,prec);  
 
   %%% Set OBCS prescription parameters
+  useOBCSprescribe = true;  
   obcs_parm01.addParm('useOBCSprescribe',useOBCSprescribe,PARM_BOOL);
   obcs_parm01.addParm('OBNtFile','OBNtFile.bin',PARM_STR);
   obcs_parm01.addParm('OBNsFile','OBNsFile.bin',PARM_STR);  
+
+
+  if (useOrlanskiEW)
+    OB_Ieast= -1*ones(Ny,1);
+    OB_Iwest= 1*ones(Ny,1);
+    %% Set east and west to be open boundary
+    obcs_parm01.addParm('OB_Ieast',OB_Ieast,PARM_INTS);    
+    obcs_parm01.addParm('OB_Iwest',OB_Iwest,PARM_INTS);    
+    %% Make those orlanski boundaries
+    obcs_parm01.addParm('useOrlanskiEast',useOrlanskiEW,PARM_BOOL);  
+    obcs_parm01.addParm('useOrlanskiWest',useOrlanskiEW,PARM_BOOL);  
+
+    %% For now using same boundary as north boundary
+    OBEt = ones(Ny,1)*tNorth;
+    OBEs = ones(Ny,1)*sNorth;  
+
+    OBWt = ones(Ny,1)*tNorth;
+    OBWs = ones(Ny,1)*sNorth;  
+    %%% Write boundary variables to files  
+    writeDataset(OBWt,fullfile(inputpath,'OBWtFile.bin'),ieee,prec);
+    writeDataset(OBWs,fullfile(inputpath,'OBWsFile.bin'),ieee,prec);  
+    writeDataset(OBEt,fullfile(inputpath,'OBEtFile.bin'),ieee,prec);
+    writeDataset(OBEs,fullfile(inputpath,'OBEsFile.bin'),ieee,prec);  
+    %%% Set OBCS prescription parameters
+    obcs_parm01.addParm('useOBCSprescribe',useOBCSprescribe,PARM_BOOL);
+    obcs_parm01.addParm('OBEtFile','OBEtFile.bin',PARM_STR);
+    obcs_parm01.addParm('OBEsFile','OBEsFile.bin',PARM_STR);  
+    obcs_parm01.addParm('OBWtFile','OBWtFile.bin',PARM_STR);
+    obcs_parm01.addParm('OBWsFile','OBWsFile.bin',PARM_STR);  
+
+
+    obcs_parm01.addParm('OBCS_balanceFacE',-1,PARM_INT);  
+    obcs_parm01.addParm('OBCS_balanceFacW',1,PARM_INT);  
+
+    obcs_parm01.addParm('OBCS_balanceFacW',1,PARM_INT);  
+
+    cvelTimeScale = 2*deltaT;
+    CMAX = 0.45; 
+    obcs_parm02.addParm('cvelTimeScale',cvelTimeScale,PARM_REAL);
+    obcs_parm02.addParm('CMAX',CMAX,PARM_REAL);
+
+    Urelaxobcsbound = 43200; 
+    Urelaxobcsinner = 864000;
+    obcs_parm03.addParm('Urelaxobcsinner',Urelaxobcsinner,PARM_REAL);
+    obcs_parm03.addParm('Urelaxobcsbound',Urelaxobcsbound,PARM_REAL);
+
+  end 
+
   
+  %%% Set boundary velocities and temperatures
+  if (useSEAICE)
+    useSeaiceSponge = true;
+    obcs_parm01.addParm('useSeaiceSponge',useSeaiceSponge,PARM_BOOL);
+  else 
+    useSeaiceSponge = false;
+  end
   if (useSEAICE)
 
     %%% Northern boundary conditions for sea ice
@@ -1499,6 +1551,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     obcs_parm01.addParm('OBNslFile','OBNslFile.bin',PARM_STR);
     obcs_parm01.addParm('OBNuiceFile','OBNuiceFile.bin',PARM_STR);
     obcs_parm01.addParm('OBNviceFile','OBNviceFile.bin',PARM_STR);
+
+
     
     
   end
@@ -1514,13 +1568,9 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
 %   %%% boundary divided by the time step over this period.
 %   %%% At the moment we're using the magic engineering factor of 3.
 %   cvelTimeScale = 2*deltaT;
-%   %%% Max dimensionless CFL for Adams-Bashforth 2nd-order method
-%   CMAX = 0.45; 
-%   
-%   obcs_parm02.addParm('cvelTimeScale',cvelTimeScale,PARM_REAL);
-%   obcs_parm02.addParm('CMAX',CMAX,PARM_REAL);
-  
-  
+ %   %%% Max dimensionless CFL for Adams-Bashforth 2nd-order method
+ %   CMAX = 0.45; 
+ %   
 
 
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1602,6 +1652,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   packages.addParm('useSHELFICE',useSHELFICE,PARM_BOOL);
   packages.addParm('useSEAICE',useSEAICE,PARM_BOOL);
   packages.addParm('useOBCS',useOBCS,PARM_BOOL);  
+  packages.addParm('useRBCS',useRBCS,PARM_BOOL);  
   packages.addParm('useLAYERS',useLAYERS,PARM_BOOL);  
 
   %%% Create the data.pkg file
