@@ -685,11 +685,22 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   writeDataset(hydroTh,fullfile(inputpath,'hydrogThetaFile.bin'),ieee,prec); 
   parm05.addParm('hydrogThetaFile','hydrogThetaFile.bin',PARM_STR);
   writeDataset(hydroSa,fullfile(inputpath,'hydrogSaltFile.bin'),ieee,prec); 
-  parm05.addParm('hydrogSaltFile','hydrogSaltFile.bin',PARM_STR); 
-  
-  
-    
-  
+  parm05.addParm('hydrogSaltFile','hydrogSaltFile.bin',PARM_STR);
+  relaxmask = zeros(Nx,Ny,Nr);
+
+  %%relaxmask(:,:,1) = 1;
+  saltflux = true
+  if (saltflux)
+    iceidx = find(Y<=Yicefront+10000 & Yicefront<Y & (X<Xtrough+(Xeast-Xwest)/2) & (X>=Xtrough-(Xeast-Xwest)/2));  
+    saltfluxvals = zeros(Nx,Ny);
+    saltfluxvals(~iceidx) = 0;
+    saltfluxfile = 'saltflux.bin';
+    saltfluxvals(iceidx) = 1.078*10^(-6);
+    %%% Align initial temp with background
+    writeDataset(saltfluxvals,fullfile(inputpath,saltfluxfile),ieee,prec); 
+    parm05.addParm('saltFluxFile','saltflux.bin',PARM_STR);
+  end
+
   
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%
   %%%%% TRACER DIFFUSION %%%%%
