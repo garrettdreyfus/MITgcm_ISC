@@ -141,7 +141,27 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   useOBCS = true;    
   useOBCSbalance = true;  
   useOrlanskiNorth = false;
-  useOrlanskiEW = true;
+  useOrlanskiEW = false;
+
+  use2Orlanski = false;
+  useEobcsWorlanski = true; %%% OBCS to the east, and Orlanski to the west
+  useEobcsWobcs = false;      %%% OBCS to the east and west
+  if(use2Orlanski)
+      useOrlanskiWest = true;
+      useOrlanskiEast = true;
+  end
+  if(useEobcsWorlanski)      %%% OBCS to the east, and Orlanski to the west
+      useOBCSeast = true;
+      useOrlanskiWest = true;
+      useOrlanskiEast = false;  
+  end
+  if(useEobcsWobcs)           %%% OBCS to the east and west
+      useOBCSeast = true;
+      useOBCSwest = true;
+      useOrlanskiWest = false;
+      useOrlanskiEast = false;  
+  end
+
   
   
   %%% PARM01
@@ -468,7 +488,14 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   Zcdw_s = Zcdw_pt - 100; %%% This is important - salinity maximum needs to 
                           %%% be deeper or else you end up with very weak 
                           %%% buoyancy frequency just below the pycnocline
-    
+  Zcdw_pt_shelf = -1200; %%% CDW depth over the shelf
+  Zcdw_pt_South = -1000; %%% CDW depth at the southern boundary
+
+  lat_Zcdw_pt = [0 Yshelfbreak Ydeep Ly];
+  Zcdw_pt_2 = [Zcdw_pt_shelf Zcdw_pt_shelf Zcdw_pt_South Zcdw_pt_South]; %%% Piecewise function
+
+  Zcdw_pt = interp1(lat_Zcdw_pt,Zcdw_pt_2,yy,'PCHIP'); 
+  Zcdw_s = Zcdw_pt - 100; %%% Th
 %   %%% Load sections from Kapp Norvegia climatology (Hattermann 2018) 
 %   ptemp_KN = ncread('KappNorvegiaCLM.nc','ptemp'); %%% at sea level pressure
 %   salt_KN = ncread('KappNorvegiaCLM.nc','salt');
@@ -484,17 +511,74 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
    
   
   %%% Artificially construct a hydrographic profile
-  H_hydro=4000
+  H_hydro=4000;
   depth_North_pt = [-H_hydro (-H_hydro+3*Zcdw_pt)/4 Zcdw_pt Zsml 0];
   depth_North_s = [-H_hydro (-H_hydro+3*Zcdw_s)/4 Zcdw_s Zsml 0];
   ptemp_North = [pt_bot (pt_bot+pt_mid)/2 pt_mid pt_surf pt_surf];
   salt_North = [s_bot (s_bot+s_mid)/2 s_mid s_surf s_surf];
+
+  ptemp_East = [pt_bot (pt_bot+pt_mid)/2 pt_mid pt_surf pt_surf];
+  salt_East = [s_bot (s_bot+s_mid)/2 s_mid s_surf s_surf];
  
+  depth_East_pt = zeros(Ny,5);
+  depth_East_s  = zeros(Ny,5);
+  tEast = zeros(Ny,Nr);
+  sEast = zeros(Ny,Nr);
+  %%% Interpolate to model grid
+  for jj = 1:Ny
+      depth_East_pt(jj,:) = [-H_hydro (-H_hydro+3*Zcdw_pt(jj))/4 Zcdw_pt(jj) Zsml 0];
+      depth_East_s(jj,:) = [-H_hydro (-H_hydro+3*Zcdw_s(jj))/4 Zcdw_s(jj) Zsml 0];
+      tEast(jj,:) = interp1(depth_East_pt(jj,:),ptemp_East,zz,'PCHIP'); %%% reference pressure level: sea surface
+      sEast(jj,:) = interp1(depth_East_s(jj,:),salt_East,zz,'PCHIP');  %%% reference pressure level: sea surface 
+  end
+
   
   %%% Interpolate to model grid
-  tNorth = interp1(depth_North_pt,ptemp_North,zz,'PCHIP'); %%% reference pressure level: sea surface
-  sNorth = interp1(depth_North_s,salt_North,zz,'PCHIP');  %%% reference pressure level: sea surface 
-  
+  tNorth = tEast(end,:);
+  sNorth = sEast(end,:);
+  uEast = zeros(Ny,Nr);
+  uEast_TWV = zeros(Ny,Nr); %%% Thermal-wind velocity
+  %     uEast_EK = zeros(Ny,Nr);  %%% Wind-driven velocity, based on Ekman theory
+  bathy_east = ones(Ny,Nr);
+  for jj = 1:Ny
+      for kk = 1:Nr
+          if(zz(kk)<h(kk,jj))
+              bathy_east(jj,kk)=NaN;
+          end
+      end
+  end
+  lon_sec = -115;
+  lat_sec = -71;
+  [ZZ,YY] = meshgrid(zz,yy);
+  [SA_east, in_ocean] = gsw_SA_from_SP(sEast,-ZZ,lon_sec,lat_sec);
+  T_insitu = gsw_t_from_pt0(SA_east,tEast,-ZZ);
+  CT_east = gsw_CT_from_pt(SA_east,tEast); 
+
+  for jj = 1:Ny
+      [N2_east(jj,:), pp_mid_east] = gsw_Nsquared(SA_east(jj,:),CT_east(jj,:),-zz,lat_sec);
+  end
+  %%%%%% Calculate thermal-wind velocity
+  bot_idx = zeros(Ny,1);
+  for jj = 1:Ny
+    if(find(isnan(bathy_east(jj,:)),1,'first')==1)
+      bot_idx(jj) = NaN;
+    elseif (find(isnan(bathy_east(jj,:)),1,'first')>1)
+      bot_idx(jj) = find(isnan(bathy_east(jj,:)),1,'first')-1;
+    else
+      bot_idx(jj) = Nr;
+    end
+  end
+
+  rho0 = 1000;
+  f = f0+beta*YY;
+  f_mid = (f(2:end,:)+f(1:end-1,:))/2;
+
+  rho_east_insitu  = gsw_rho(SA_east,CT_east,-zz); %%% in-situ density
+  drhody = (rho_east_insitu(2:end,:)-rho_east_insitu(1:end-1,:))./dy(1);
+  uEast_mid = g/rho0./f_mid.*cumsum(drhody.*dz,2,'reverse');
+  uEast_TWV(2:end-1,:) = (uEast_mid(1:end-1,:)+uEast_mid(2:end,:))/2; %%% Thermal-wind velocity
+  uEast = uEast_TWV;
+
   %%% Plot the relaxation temperature
   if (showplots)
     figure(fignum);
@@ -689,7 +773,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   relaxmask = zeros(Nx,Ny,Nr);
 
   %%relaxmask(:,:,1) = 1;
-  saltflux = true
+  saltflux = false;
   if (saltflux)
     iceidx = find(Y<=Yicefront+10000 & Yicefront<Y & (X<Xtrough+(Xeast-Xwest)/2) & (X>=Xtrough-(Xeast-Xwest)/2));  
     saltfluxvals = zeros(Nx,Ny);
@@ -1452,6 +1536,22 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%% reflection      
   obcs_parm01.addParm('useOrlanskiNorth',useOrlanskiNorth,PARM_BOOL);  
   
+  if(use2Orlanski|useEobcsWorlanski|useEobcsWobcs)
+      obcs_parm01.addParm('useOrlanskiEast',useOrlanskiEast,PARM_BOOL);
+      obcs_parm01.addParm('useOrlanskiWest',useOrlanskiWest,PARM_BOOL);
+      %%% Velocity averaging time scale - must be larger than deltaT.
+      %%% The Orlanski radiation condition computes the characteristic velocity
+      %%% at the boundary by averaging the spatial derivative normal to the 
+      %%% boundary divided by the time step over this period.
+      %%% At the moment we're using the magic engineering factor of 3.
+      cvelTimeScale = 3*deltaT; % Averaging period for phase speed (s)
+      %%% Max dimensionless CFL for Adams-Basthforth 2nd-order method
+      CMAX = 0.45; 
+      
+      obcs_parm02.addParm('cvelTimeScale',cvelTimeScale,PARM_REAL);
+      obcs_parm02.addParm('CMAX',CMAX,PARM_REAL);
+  end
+
   %%% Enforces mass conservation across the northern boundary by adding a
   %%% barotropic inflow/outflow    
   obcs_parm01.addParm('useOBCSbalance',useOBCSbalance,PARM_BOOL);
@@ -1477,53 +1577,6 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   obcs_parm01.addParm('useOBCSprescribe',useOBCSprescribe,PARM_BOOL);
   obcs_parm01.addParm('OBNtFile','OBNtFile.bin',PARM_STR);
   obcs_parm01.addParm('OBNsFile','OBNsFile.bin',PARM_STR);  
-
-
-  if (useOrlanskiEW)
-    OB_Ieast= -1*ones(Ny,1);
-    OB_Iwest= 1*ones(Ny,1);
-    %% Set east and west to be open boundary
-    obcs_parm01.addParm('OB_Ieast',OB_Ieast,PARM_INTS);    
-    obcs_parm01.addParm('OB_Iwest',OB_Iwest,PARM_INTS);    
-    %% Make those orlanski boundaries
-    obcs_parm01.addParm('useOrlanskiEast',useOrlanskiEW,PARM_BOOL);  
-    obcs_parm01.addParm('useOrlanskiWest',useOrlanskiEW,PARM_BOOL);  
-
-    %% For now using same boundary as north boundary
-    OBEt = ones(Ny,1)*tNorth;
-    OBEs = ones(Ny,1)*sNorth;  
-
-    OBWt = ones(Ny,1)*tNorth;
-    OBWs = ones(Ny,1)*sNorth;  
-    %%% Write boundary variables to files  
-    writeDataset(OBWt,fullfile(inputpath,'OBWtFile.bin'),ieee,prec);
-    writeDataset(OBWs,fullfile(inputpath,'OBWsFile.bin'),ieee,prec);  
-    writeDataset(OBEt,fullfile(inputpath,'OBEtFile.bin'),ieee,prec);
-    writeDataset(OBEs,fullfile(inputpath,'OBEsFile.bin'),ieee,prec);  
-    %%% Set OBCS prescription parameters
-    obcs_parm01.addParm('useOBCSprescribe',useOBCSprescribe,PARM_BOOL);
-    obcs_parm01.addParm('OBEtFile','OBEtFile.bin',PARM_STR);
-    obcs_parm01.addParm('OBEsFile','OBEsFile.bin',PARM_STR);  
-    obcs_parm01.addParm('OBWtFile','OBWtFile.bin',PARM_STR);
-    obcs_parm01.addParm('OBWsFile','OBWsFile.bin',PARM_STR);  
-
-
-    obcs_parm01.addParm('OBCS_balanceFacE',-1,PARM_INT);  
-    obcs_parm01.addParm('OBCS_balanceFacW',1,PARM_INT);  
-
-    obcs_parm01.addParm('OBCS_balanceFacW',1,PARM_INT);  
-
-    cvelTimeScale = 2*deltaT;
-    CMAX = 0.45; 
-    obcs_parm02.addParm('cvelTimeScale',cvelTimeScale,PARM_REAL);
-    obcs_parm02.addParm('CMAX',CMAX,PARM_REAL);
-
-    Urelaxobcsbound = 43200; 
-    Urelaxobcsinner = 864000;
-    obcs_parm03.addParm('Urelaxobcsinner',Urelaxobcsinner,PARM_REAL);
-    obcs_parm03.addParm('Urelaxobcsbound',Urelaxobcsbound,PARM_REAL);
-
-  end 
 
   
   %%% Set boundary velocities and temperatures
@@ -1603,7 +1656,65 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     
   end
     
+  if(useEobcsWorlanski|useEobcsWobcs)
+        Urelaxobcsinner = 864000;
+        Urelaxobcsbound = 43200;
+        obcs_parm03.addParm('Urelaxobcsinner',Urelaxobcsinner,PARM_REAL);
+        obcs_parm03.addParm('Urelaxobcsbound',Urelaxobcsbound,PARM_REAL);  
+  end
+
+  if(use2Orlanski|useEobcsWorlanski|useEobcsWobcs)
+      OB_Ieast= Nx*ones(1,Ny);
+      obcs_parm01.addParm('OB_Ieast',OB_Ieast,PARM_INTS); 
+      OB_Iwest= ones(1,Ny);
+      obcs_parm01.addParm('OB_Iwest',OB_Iwest,PARM_INTS); 
+  end
+
+  if(use2Orlanski|useEobcsWorlanski|useEobcsWobcs)
+      OBCS_balanceFacE = 1; %%% A value -1 balances an individual boundary
+      OBCS_balanceFacW = 1;
+      obcs_parm01.addParm('OBCS_balanceFacE',OBCS_balanceFacE,PARM_REAL); 
+      obcs_parm01.addParm('OBCS_balanceFacW',OBCS_balanceFacW,PARM_REAL);  
+  end
   
+  if(useEobcsWorlanski) %%% OBCS to the east, and Orlanski to the west
+      OBEt = tEast;
+      OBEs = sEast;
+      OBEu = uEast;
+      %%%%%% Define OBCS Eastern boundary
+      writeDataset(OBEt,fullfile(inputpath,'OBEtFile.bin'),ieee,prec);
+      writeDataset(OBEs,fullfile(inputpath,'OBEsFile.bin'),ieee,prec);
+      writeDataset(OBEu,fullfile(inputpath,'OBEuFile.bin'),ieee,prec);
+      obcs_parm01.addParm('OBEtFile','OBEtFile.bin',PARM_STR);
+      obcs_parm01.addParm('OBEsFile','OBEsFile.bin',PARM_STR);
+      obcs_parm01.addParm('OBEuFile','OBEuFile.bin',PARM_STR);
+  end
+
+  if(useEobcsWobcs) %%% OBCS to the east and west
+      OBEt = tEast;
+      OBEs = sEast;
+      OBEu = uEast;
+
+      OBWt = tWest;
+      OBWs = sWest;
+      OBWu = uWest;
+
+      %%%%%% Define OBCS Eastern boundary
+      writeDataset(OBEt,fullfile(inputpath,'OBEtFile.bin'),ieee,prec);
+      writeDataset(OBEs,fullfile(inputpath,'OBEsFile.bin'),ieee,prec);
+      writeDataset(OBEu,fullfile(inputpath,'OBEuFile.bin'),ieee,prec);
+      obcs_parm01.addParm('OBEtFile','OBEtFile.bin',PARM_STR);
+      obcs_parm01.addParm('OBEsFile','OBEsFile.bin',PARM_STR);
+      obcs_parm01.addParm('OBEuFile','OBEuFile.bin',PARM_STR);
+      %%%%%% Define OBCS Western boundary
+      writeDataset(OBWt,fullfile(inputpath,'OBWtFile.bin'),ieee,prec);
+      writeDataset(OBWs,fullfile(inputpath,'OBWsFile.bin'),ieee,prec);
+      writeDataset(OBWu,fullfile(inputpath,'OBWuFile.bin'),ieee,prec);
+      obcs_parm01.addParm('OBWtFile','OBWtFile.bin',PARM_STR);
+      obcs_parm01.addParm('OBWsFile','OBWsFile.bin',PARM_STR);
+      obcs_parm01.addParm('OBWuFile','OBWuFile.bin',PARM_STR);
+  end
+
   if (useSeaiceSponge)
     T_relaxinner = 864000/10;
     T_relaxbound = 43200/6;
