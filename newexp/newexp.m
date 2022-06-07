@@ -77,6 +77,7 @@
   use_mpi = true; %%% set true for parallel processing
   use_pbs = true; %%% set true for execution via PBS
   cluster = 'hoffman2';
+  exclusive=true
   queue = 'all.q';
   sNx = 16; %%% no. of x-gridpoints per tile
   sNy = 25; %%% no. of y-gridpoints per tile
@@ -395,7 +396,11 @@
       case 'hoffman2'
 	display(resultspath);
         createPBSfile_Hoffman(resultspath,exp_name,nodes);        
-        runcommands = [runcommands,'qsub run_mitgcm > output.txt',lf];
+	if exclusive
+          runcommands = [runcommands,'qsub -l exclusive run_mitgcm > output.txt',lf];
+	else
+          runcommands = [runcommands,'qsub run_mitgcm > output.txt',lf];
+	end
       otherwise %%% Defaults to Ardbeg
         createPBSfile(resultspath,exp_name,nodes,queue);
         runcommands = [runcommands,'qsub run_mitgcm > output.txt',lf];
