@@ -78,13 +78,13 @@
   use_pbs = true; %%% set true for execution via PBS
   cluster = 'hoffman2';
   queue = 'all.q';
-  sNx = 10; %%% no. of x-gridpoints per tile
-  sNy = 13; %%% no. of y-gridpoints per tile
+  sNx = 16; %%% no. of x-gridpoints per tile
+  sNy = 25; %%% no. of y-gridpoints per tile
 
-  nPx = 10; %%% no. of processors in x-direction
+  nPx = 12; %%% no. of processors in x-direction
   nPy = 6; %%% no. of processors in y-direction
 
-  Nr = 100; %%% no. of z-gridpoints
+  Nr = 91; %%% no. of z-gridpoints
   
   
   %%% N.B. bverything in this section below this is old code, and will not

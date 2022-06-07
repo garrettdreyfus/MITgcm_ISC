@@ -44,10 +44,12 @@ function createPBSfile_Hoffman (dirname,expname,nodes)
   'mpirun ./mitgcmuv'];
   
   %%% Open output script and write header text
+  display(fullfile(dirname,'run_mitgcm'))
   wfid = fopen(fullfile(dirname,'run_mitgcm'),'w');
   if (wfid == -1)
     error('Could not open PBS script file');
   end
+
   fprintf(wfid,headertext); 
   
   %%% Close files when we're done

@@ -100,7 +100,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   
   %%% Topographic parameters 
   Wslope = 30*m1km; %%% Continental slope half-width
-  Hshelf = 800; %%% Continental shelf depth
+  Hshelf = 600; %%% Continental shelf depth
   Wshelf = 50*m1km; %%% Width of continental shelf
   Ycoast = 200*m1km; %%% Latitude of coastline
   Wcoast = 20*m1km; %%% Width of coastal wall slope
@@ -113,7 +113,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   Hicefront = 200; %%% Depth of ice shelf frace
   Hbed = -500; %%% Change in bed elevation from shelf break to southern domain edge
   Hice = Hicefront-(Hshelf-Hbed); %%% Change in ice thickness from ice fromt to southern domain edge
-  Htrough = 300; %%% Trough depth
+  Htrough = 100; %%% Trough depth
   Wtrough = 15*m1km; %%% Trough width
   Xtrough = Lx/2; %%% Longitude of trough
   
@@ -133,15 +133,16 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%% Package options
   useSEAICE = false;
   useSHELFICE = true;     
-  useLAYERS = true;      
-  useEXF = useSEAICE;  
+  useLAYERS = false;      
+  useEXF = false;  
   useRBCS = false;  
   
   %%% OBCS package options
   useOBCS = true;    
   useOBCSbalance = true;  
   useOrlanskiNorth = false;
-  useOrlanskiEW = false;
+  useOrlanskiEW = true;
+  useRandTopo = false;
 
   use2Orlanski = false;
   useEobcsWorlanski = true; %%% OBCS to the east, and Orlanski to the west
@@ -246,7 +247,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   parm03.addParm('nIter0',nIter0,PARM_INT);
   parm03.addParm('abEps',0.1,PARM_REAL);
   parm03.addParm('chkptFreq',t1year/12,PARM_REAL); % rolling 
-  parm03.addParm('pChkptFreq',t1year,PARM_REAL); % permanent
+  parm03.addParm('pChkptFreq',t1year/3,PARM_REAL); % permanent
   parm03.addParm('taveFreq',0,PARM_REAL); % it only works properly, if taveFreq is a multiple of the time step deltaT (or deltaTclock).
   parm03.addParm('dumpFreq',0,PARM_REAL); % interval to write model state/snapshot data (s)
   parm03.addParm('monitorFreq',t1year/12,PARM_REAL); % interval to write monitor output (s)
@@ -296,13 +297,14 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   N1 = 20; 
   N2 = 50;
   N3 = 15;
-  N4 = 14;  
+  N4 = 5;  
   nn_c = cumsum([N0 N1 N2 N3 N4]);
   dz_c = [dz0 dz1 dz2 dz3 dz4];
   nn = 1:(N1+N2+N3+N4+1);
   dz = interp1(nn_c,dz_c,nn,'pchip');
 
   zz = -cumsum((dz+[0 dz(1:end-1)])/2);
+  display(zz(end))
   if (length(zz) ~= Nr)
     error('Vertical grid size does not match vertical array dimension!');
   end
@@ -389,8 +391,15 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   h_coast(coastidx) = h_coast(coastidx) - h(coastidx).*coastShape(-(X(coastidx)-Xeast-Wcoast/2)/Wcoast);   
   
   h = h + h_coast;
- 
-  
+
+  if(useRandTopo) 
+    randtopog_height = 0.2*m1km
+    randtopog_length = 62.5*m1km;
+    h_rand = genRandField(randtopog_length,[],randtopog_height,Nx,Ny,Lx,Ly);
+    h_rand = h_rand - min(min(h_rand));
+    h_rand = h_rand .* (-h/H); %%% Scale by topographic height so that bumps are most pronounced in deep areas
+    h = h + h_rand;
+  end
   
  
   %%% Construct ice shelf
@@ -484,12 +493,12 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   % at -1000
   % at -1500
   
-  Zcdw_pt = -1000;
+  Zcdw_pt = -400;
   Zcdw_s = Zcdw_pt - 100; %%% This is important - salinity maximum needs to 
                           %%% be deeper or else you end up with very weak 
                           %%% buoyancy frequency just below the pycnocline
-  Zcdw_pt_shelf = -1200; %%% CDW depth over the shelf
-  Zcdw_pt_South = -1000; %%% CDW depth at the southern boundary
+  Zcdw_pt_shelf = -450; %%% CDW depth over the shelf
+  Zcdw_pt_South = -400; %%% CDW depth at the southern boundary
 
   lat_Zcdw_pt = [0 Yshelfbreak Ydeep Ly];
   Zcdw_pt_2 = [Zcdw_pt_shelf Zcdw_pt_shelf Zcdw_pt_South Zcdw_pt_South]; %%% Piecewise function
@@ -845,7 +854,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     SHELFICEheatTransCoeff = 0;     %%% Turn off linear heat transfer
     SHELFICEthetaSurface = -20;     %%% Defauly value
     SHELFICEuseGammaFrict = true;   %%% Turn on friction-dependent heat transfer
-    SHELFICEboundaryLayer = false;  %%% Turn on to average velocities over top dz of water column when computing friction velocity
+    SHELFICEboundaryLayer = true;  %%% Turn on to average velocities over top dz of water column when computing friction velocity
     SHELFICEconserve = false;       %%% Turns on conservative form of 3-equation IOBL parameterization
     
     %%% Save as a parameter   
@@ -1390,7 +1399,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
 
 
   %%% Annual mean diagnostics
-  diag_fields_avg = {'SHIfwFlx','SALT','THETA','momKE','RHOAnoma','LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO','VVEL','PHIHYD'};
+  diag_fields_avg = {'SHIfwFlx','SALT','THETA','momKE','RHOAnoma'};%,'LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO','VVEL','PHIHYD'};
   % % %      'UVEL','VVEL','WVEL','SALT','THETA','PHIHYD','ETAN',...%%% Basic state 
   % % %      'TOTTTEND','TFLUX','ADVy_TH','VVELTH','oceQnet',...%%% Heat budget
   % % %      'UVELSQ','VVELSQ','WVELSQ','UV_VEL_Z','WU_VEL','WV_VEL',...%%% Energy budget
