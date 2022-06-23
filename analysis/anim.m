@@ -14,7 +14,7 @@ mac_plots = 0;
 loadexp;
 
 %%% Select diagnostic variable to animate
-diagnum = 8;
+diagnum = 3;
 outfname = diag_fileNames{1,diagnum};
 
 %%% Data index in the output data files
@@ -22,7 +22,7 @@ outfidx = 1;
 
 %%% If set true, plots a top-down view of the field in a given layer.
 %%% Otherwise plots a side-on view of the zonally-averaged field
-xyplot = 1;
+xyplot = 0;
 
 %%% Vertical layer index to use for top-down plots
 xylayer = 1;
@@ -50,7 +50,7 @@ set_crange = 1;
 
 
 % crange = [-2.2 -1.6]; %/%% Filchner temp
-% crange = [-2 1]; %%%temp
+crange = [-2 1]; %%%temp
 % crange = [34.1 34.7]; %%% salinity
 % crange = [33.9 34.3]; %%% surface salinity
 % crange = [0 10]; %%%% for KPP hbl
@@ -59,15 +59,15 @@ set_crange = 1;
 % crange = [-1 1]*1e-4; %%% For freshwater fluxes
 % crange =[-100 100]; %%% Qnet
 % crange = [-300 300]; %%% swnet
-crange = [0 1]; %%% SI thickness
+% crange = [0 1]; %%% SI thickness
 % crange = [-0.01 0.01];
 
 % cmap = pmkmp(100,'Swtth');
 % cmap = cmocean('haline',100);
-% cmap = cmocean('thermal',100);
+cmap = cmocean('thermal',100);
 % cmap = cmocean('ice',100);
 % cmap = haxby;
-cmap = jet(200);
+% cmap = jet(200);
 % cmap = redblue(100);
 
 % titlestr = 'Bottom salinity (g/kg)';
@@ -201,7 +201,7 @@ for n=1:length(dumpIters)
 %   Amean(n) = sum(sum(sum(A.*DX.*DY.*DZ.*hFacC)))/sum(sum(sum(DX.*DY.*DZ.*hFacC)));
   
 %   A(hFacC==0)   = NaN;
-  [nanmin(A(:)) nanmax(A(:))]
+[min(A(:),[],'omitnan') max(A(:),[],'omitnan')]
   
     
 %   Axy = sum(A.*DY.*DZ.*hFacW,3);
@@ -255,7 +255,7 @@ for n=1:length(dumpIters)
     if (yzavg)
       Ayz = squeeze(A(:,:,:,outfidx));
       Ayz(hFacC==0) = NaN;
-      Ayz = squeeze(nanmean(Ayz,1));    
+Ayz = squeeze(mean(Ayz,1,'omitnan'));    
     else
       Ayz = squeeze(A(yzlayer,:,:,outfidx));
       Ayz(squeeze(hFacC(yzlayer,:,:))==0) = NaN;

@@ -4,7 +4,7 @@
 %%% Reads and sums all iterations of a specified MITgcm output field
 %%% between specified times, and calculates the time average.
 %%%
-function avg = readIters (exppath,field,dumpIters,deltaT,tmin,tmax,Nx,Ny,Nr)
+function avg = readIters (exppath,field,dumpIters,nDumps,deltaT,tmin,tmax,Nx,Ny,Nr)
  
   avg = zeros(Nx,Ny,Nr);
   navg = 0;

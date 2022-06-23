@@ -315,7 +315,7 @@ function calcOverturning_rho_Aocean (expdir,expname,prodir)
     [DD,LL] = meshgrid(ptlevs,yy);
 
     figure(32)
-    PSIlim=[-0.01 0.01];
+    PSIlim=[-0.001 0.001];
     subplot(2,3,1)
     pcolor(yy/1000,ptlevs,psi_pt');
     shading interp;colormap('redblue');colorbar;caxis(PSIlim);

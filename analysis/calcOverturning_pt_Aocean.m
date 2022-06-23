@@ -14,7 +14,7 @@ function calcOverturning_pt_Aocean (expdir,expname,prodir)
 
   %%% Load experiment
   loadexp;
-
+  disp(layers_bounds)
   %%% Density bins for MOC calculation  
   ptlevs = layers_bounds(:,2);
   Npt = length(ptlevs)-1;
@@ -284,7 +284,7 @@ function calcOverturning_pt_Aocean (expdir,expname,prodir)
     title('\psi (Sv), interpolating Zisop')
     subplot(2,2,4)
     pcolor(LL/1000,Zisop,psi_pt);
-    shading interp;colormap('redblue');colorbar;caxis([-5 5]);
+    shading interp;colormap('redblue');colorbar;caxis(["auto"]);
     hold on;
     contour(LL/1000,Zisop,DD,[-1:1:12],'EdgeColor','w');
     hold off;

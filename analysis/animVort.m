@@ -49,7 +49,7 @@ for n=1:nDumps
   %%% Plot the vorticity  
   [YY,XX] = meshgrid(yy,xx);  
   vort = zeros(Nx,Ny);
-  zlev = 1;
+  zlev = 53;
   vort(:,2:Ny) = - (uvel(:,2:Ny,zlev)-uvel(:,1:Ny-1,zlev))/delY(1);
   vort = vort + (vvel([2:Nx 1],:,zlev)-vvel(:,:,zlev))/delX(1);
 %   ubt = sum(uvel.*DZ.*hFacW,3) ./ sum(DZ.*hFacW,3);

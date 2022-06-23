@@ -11,7 +11,6 @@ from tqdm import tqdm
 def timeSeriesDashboard(fname,label,fig,axises,times=np.array([])):
     ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
-
     if times.any():
         ds = open_mdsdataset(fname,ignore_unknown_vars=True,iters=times,extra_variables = extra_variables)
     else:
@@ -20,6 +19,13 @@ def timeSeriesDashboard(fname,label,fig,axises,times=np.array([])):
         ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
     totalvolume  = (ds.XC*ds.YC*ds.Z*ds.hFacC).sum().values
     ## theta plot
+
+    ts = ds.time.values*108.0/60.0/60.0/24.0/365.0
+    tsnew = np.full_like(ts,0,dtype=float)
+    tsnew[:] = ts
+    ts = tsnew
+    ts = ts/1000000000
+    times=ts
     totaltheta = (ds.THETA*ds.XC*ds.YC*ds.Z*ds.hFacC).sum(axis=[1,2,3]).values
     ax1.plot(times,totaltheta/totalvolume,label=label)
     ax1.set_xlabel("Time")
@@ -48,7 +54,7 @@ def timeSeriesDashboard(fname,label,fig,axises,times=np.array([])):
     ax4.plot(times,totalSHIfwFlx,label=label)
     ax4.set_xlabel("Time")
     ax4.set_ylabel("Fresh Water Flux")
-
+    ax6.remove()
 
     bottomtemps = []
     surfacetemps = []
@@ -186,7 +192,7 @@ def crossSectionAnim(fname,description,times=np.array([]),quant="THETA"):
             cb.remove()
             frame.remove()
 
-def bottomAnim(fname,description,times=np.array([]),quant="THETA"):
+def bottomAnim(fname,description,times=np.array([]),quant="SALT"):
     fig,ax1 = plt.subplots()
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
@@ -204,15 +210,17 @@ def bottomAnim(fname,description,times=np.array([]),quant="THETA"):
     with moviewriter.saving(fig, fpath+"-bot.mp4", dpi=250):
         print("writing movie")
         for k in tqdm([0]+list(range(quantvals.shape[0]))+[-1]):
-            X = np.full_like(quantvals[k],np.nan,dtype=float)
-            X[ds.hFacC.values != 0]= quantvals[k][ds.hFacC.values != 0]
+            d = np.mean(quantvals,axis=0)
+            X = np.full_like(d,np.nan,dtype=float)
+            X[ds.hFacC.values != 0]= d[ds.hFacC.values != 0]
             znew = np.multiply(zmask,X)
             nancount = np.nansum(np.isnan(znew),axis=0)
             znew = np.nansum(znew,axis=0)
             znew[nancount==X.shape[0]] = np.nan
-            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet",vmin=-2,vmax=1)
+            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet",vmin=34.4,vmax=34.65)
             ax1.contour(ds.XC.values,ds.YC.values,depth,colors="black",levels=20)
             cb = plt.colorbar(frame)
+            plt.show()
             moviewriter.grab_frame()
             cb.remove()
             frame.remove()
@@ -263,15 +271,16 @@ def getIterNums(fpath):
             saltiters.append(n)
     return np.unique(np.asarray(np.intersect1d(iters,saltiters)))[:-1]
 
- #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish/test/results","Restricted y domain length with default settings",times = np.asarray(range(1,9))*420480)
+#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish/test/results","Restricted y domain length with default settings",times = np.asarray(range(1,9))*420480)
 #fig,axises = plt.subplots(2,3)
 #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","2O-r",fig,axises)
 #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","PIG",fig,axises)
 #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","2O",fig,axises)
+#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","steep",fig,axises)
 #plt.show()
 
 #meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings")
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings")
+#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings")
 #barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings")
 #barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings")
 #barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings")
@@ -290,7 +299,7 @@ def getIterNums(fpath):
 #crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-w/at/results","Restricted y domain length with default settings",quant="THETA")
 #crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","Restricted y domain length with default settings",quant="SALT")
 #crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings")
 #crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings")
 #crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings")
 #crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","Restricted y domain length with default settings")
@@ -302,17 +311,17 @@ def getIterNums(fpath):
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/crashtest1/results","Restricted y domain length with default settings")
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/crashtest-orlanskiw/results","Restricted y domain length with default settings")
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/tcline-at-glib/results","Restricted y domain length with default settings")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings",quant="THETA")
+bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings",quant="SALT")
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings",quant="THETA")
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings",quant="THETA")
-bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings",quant="THETA")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings",quant="THETA")
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings",quant="THETA")
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings",quant="THETA")
 
 #surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings",quant="THETA")
 #surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings",quant="THETA")
 #surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings",quant="THETA")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings",quant="THETA")
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings",quant="THETA")
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","Restricted y domain length with default settings",quant="THETA")
 #bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/above/results","Restricted y domain length with default settings",quant="THETA")

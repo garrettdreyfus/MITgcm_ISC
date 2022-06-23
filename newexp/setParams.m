@@ -1,3 +1,4 @@
+
 %%%
 %%% setParams.m
 %%%
@@ -100,7 +101,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   
   %%% Topographic parameters 
   Wslope = 30*m1km; %%% Continental slope half-width
-  Hshelf = 600; %%% Continental shelf depth
+  Hshelf = 450; %%% Continental shelf depth
   Wshelf = 50*m1km; %%% Width of continental shelf
   Ycoast = 200*m1km; %%% Latitude of coastline
   Wcoast = 20*m1km; %%% Width of coastal wall slope
@@ -111,7 +112,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   Xwest = 125*m1km; %%% Longitude of western trough wall
   Yicefront = 150*m1km; %%% Latitude of ice shelf face
   Hicefront = 200; %%% Depth of ice shelf frace
-  Hbed = -500; %%% Change in bed elevation from shelf break to southern domain edge
+  Hbed = -300; %%% Change in bed elevation from shelf break to southern domain edge
   Hice = Hicefront-(Hshelf-Hbed); %%% Change in ice thickness from ice fromt to southern domain edge
   Htrough = 100; %%% Trough depth
   Wtrough = 15*m1km; %%% Trough width
@@ -133,7 +134,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%% Package options
   useSEAICE = false;
   useSHELFICE = true;     
-  useLAYERS = false;      
+  useLAYERS = true;      
   useEXF = false;  
   useRBCS = false;  
   
@@ -141,8 +142,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   useOBCS = true;    
   useOBCSbalance = true;  
   useOrlanskiNorth = false;
-  useOrlanskiEW = true;
-  useRandTopo = false;
+  useOrlanskiEW = false;
+  useRandTopo = true;
 
   use2Orlanski = false;
   useEobcsWorlanski = true; %%% OBCS to the east, and Orlanski to the west
@@ -246,11 +247,11 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   end
   parm03.addParm('nIter0',nIter0,PARM_INT);
   parm03.addParm('abEps',0.1,PARM_REAL);
-  parm03.addParm('chkptFreq',t1year/12,PARM_REAL); % rolling 
+  parm03.addParm('chkptFreq',t1year,PARM_REAL); % rolling 
   parm03.addParm('pChkptFreq',t1year/3,PARM_REAL); % permanent
   parm03.addParm('taveFreq',0,PARM_REAL); % it only works properly, if taveFreq is a multiple of the time step deltaT (or deltaTclock).
   parm03.addParm('dumpFreq',0,PARM_REAL); % interval to write model state/snapshot data (s)
-  parm03.addParm('monitorFreq',t1year/12,PARM_REAL); % interval to write monitor output (s)
+  parm03.addParm('monitorFreq',t1year/2,PARM_REAL); % interval to write monitor output (s)
   parm03.addParm('dumpInitAndLast',true,PARM_BOOL);
   parm03.addParm('pickupStrictlyMatch',false,PARM_BOOL); 
   
@@ -485,7 +486,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   s_bot = 34.65;
   pt_bot = -0.5;
   s_mid = 34.67;
-  pt_mid = 1;
+  pt_mid = 1.5;
   s_surf = 34.15;
   pt_surf = -1.8;
   Zsml = -50;
@@ -493,12 +494,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   % at -1000
   % at -1500
   
-  Zcdw_pt = -400;
-  Zcdw_s = Zcdw_pt - 100; %%% This is important - salinity maximum needs to 
                           %%% be deeper or else you end up with very weak 
                           %%% buoyancy frequency just below the pycnocline
-  Zcdw_pt_shelf = -450; %%% CDW depth over the shelf
-  Zcdw_pt_South = -400; %%% CDW depth at the southern boundary
+  Zcdw_pt_shelf = -550; %%% CDW depth over the shelf
+  Zcdw_pt_South = -450; %%% CDW depth at the southern boundary
 
   lat_Zcdw_pt = [0 Yshelfbreak Ydeep Ly];
   Zcdw_pt_2 = [Zcdw_pt_shelf Zcdw_pt_shelf Zcdw_pt_South Zcdw_pt_South]; %%% Piecewise function
@@ -1399,8 +1398,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
 
 
   %%% Annual mean diagnostics
-  diag_fields_avg = {'SHIfwFlx','SALT','THETA','momKE','RHOAnoma'};%,'LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO','VVEL','PHIHYD'};
-  % % %      'UVEL','VVEL','WVEL','SALT','THETA','PHIHYD','ETAN',...%%% Basic state 
+  diag_fields_avg = {'SHIfwFlx','SALT','THETA','momKE','RHOAnoma','LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO',...
+		     'UVEL','VVEL','WVEL','PHIHYD','ETAN'};%%% Basic state 
   % % %      'TOTTTEND','TFLUX','ADVy_TH','VVELTH','oceQnet',...%%% Heat budget
   % % %      'UVELSQ','VVELSQ','WVELSQ','UV_VEL_Z','WU_VEL','WV_VEL',...%%% Energy budget
   % % %      'LaVH1RHO','LaHs1RHO',...%%% Overturning circ
@@ -1443,7 +1442,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   % % % % % %          'Vm_Diss','Vm_Advec','Vm_Cori','Vm_dPhiY','Vm_Ext','Vm_AdvZ3','Vm_AdvRe',...
   % % % % % %          'VISrI_Um','VISrI_Vm',...
   numdiags_avg = length(diag_fields_avg);  
-  diag_freq_avg = 1*t1year;
+  diag_freq_avg = t1year/12.0;
 
   diag_phase_avg = 0;    
       
@@ -1704,9 +1703,9 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
       OBEs = sEast;
       OBEu = uEast;
 
-      OBWt = tWest;
-      OBWs = sWest;
-      OBWu = uWest;
+      OBWt = tEast;
+      OBWs = sEast;
+      OBWu = uEast;
 
       %%%%%% Define OBCS Eastern boundary
       writeDataset(OBEt,fullfile(inputpath,'OBEtFile.bin'),ieee,prec);
