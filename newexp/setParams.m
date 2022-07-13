@@ -5,7 +5,7 @@
 %%% Sets basic MITgcm parameters plus parameters for included packages, and
 %%% writes out the appropriate input files.,
 %%%
-function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
+function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,experiment_parameters)
 
   %%% Load EOS utilities
   addpath ~/Documents/GSW/
@@ -63,7 +63,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%%%% FIXED PARAMETER VALUES %%%%%
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-  simTime = 20*t1year; %%% Simulation time   
+  simTime = 10*t1year; %%% Simulation time   
 %   simTime = 60*t1day;
   nIter0 = 0; %%% Initial iteration 
   Lx = 400*m1km; %%% Domain size in x 
@@ -101,7 +101,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   
   %%% Topographic parameters 
   Wslope = 30*m1km; %%% Continental slope half-width
-  Hshelf = 450; %%% Continental shelf depth
+  Hshelf = experiment_parameters.shelf_depth; %%% Continental shelf depth
   Wshelf = 50*m1km; %%% Width of continental shelf
   Ycoast = 200*m1km; %%% Latitude of coastline
   Wcoast = 20*m1km; %%% Width of coastal wall slope
@@ -112,9 +112,9 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   Xwest = 125*m1km; %%% Longitude of western trough wall
   Yicefront = 150*m1km; %%% Latitude of ice shelf face
   Hicefront = 200; %%% Depth of ice shelf frace
-  Hbed = -300; %%% Change in bed elevation from shelf break to southern domain edge
+  Hbed = experiment_parameters.cavity_depth; %%% Change in bed elevation from shelf break to southern domain edge
   Hice = Hicefront-(Hshelf-Hbed); %%% Change in ice thickness from ice fromt to southern domain edge
-  Htrough = 100; %%% Trough depth
+  Htrough = experiment_parameters.trough_depth; %%% Trough depth
   Wtrough = 15*m1km; %%% Trough width
   Xtrough = Lx/2; %%% Longitude of trough
   
@@ -136,14 +136,14 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   useSHELFICE = true;     
   useLAYERS = true;      
   useEXF = false;  
-  useRBCS = false;  
+  useRBCS = experiment_parameters.rbcs_temp;  
   
   %%% OBCS package options
   useOBCS = true;    
   useOBCSbalance = true;  
   useOrlanskiNorth = false;
   useOrlanskiEW = false;
-  useRandTopo = true;
+  useRandTopo = experiment_parameters.rand_topo;
 
   use2Orlanski = false;
   useEobcsWorlanski = true; %%% OBCS to the east, and Orlanski to the west
@@ -251,7 +251,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   parm03.addParm('pChkptFreq',t1year/3,PARM_REAL); % permanent
   parm03.addParm('taveFreq',0,PARM_REAL); % it only works properly, if taveFreq is a multiple of the time step deltaT (or deltaTclock).
   parm03.addParm('dumpFreq',0,PARM_REAL); % interval to write model state/snapshot data (s)
-  parm03.addParm('monitorFreq',t1year/2,PARM_REAL); % interval to write monitor output (s)
+  parm03.addParm('monitorFreq',(t1year/12.0)*experiment_parameters.monitor_freq,PARM_REAL); % interval to write monitor output (s)
   parm03.addParm('dumpInitAndLast',true,PARM_BOOL);
   parm03.addParm('pickupStrictlyMatch',false,PARM_BOOL); 
   
@@ -393,21 +393,21 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   
   h = h + h_coast;
 
-  if(useRandTopo) 
-    randtopog_height = 0.2*m1km
-    randtopog_length = 62.5*m1km;
-    h_rand = genRandField(randtopog_length,[],randtopog_height,Nx,Ny,Lx,Ly);
-    h_rand = h_rand - min(min(h_rand));
-    h_rand = h_rand .* (-h/H); %%% Scale by topographic height so that bumps are most pronounced in deep areas
-    h = h + h_rand;
-  end
-  
- 
   %%% Construct ice shelf
   icedraft = zeros(Nx,Ny);
   iceidx = find(Y<=Yicefront);  
   icedraft(iceidx) = -Hicefront - (Y(iceidx)-Yicefront)/Yicefront * Hice;
   icedraft(icedraft<h) = h(icedraft<h);
+  if(useRandTopo) 
+    rng(experiment_parameters.rng_seed);
+    randtopog_height = experiment_parameters.random_amplitude;
+    randtopog_length = 62.5*m1km;
+    h_rand = genRandField(randtopog_length,[],randtopog_height,Nx,Ny,Lx,Ly);
+    h_rand = h_rand - min(min(h_rand));
+    h_rand = h_rand .* ((icedraft-h)/(H)); %%% Scale by topographic height so that bumps are most pronounced in deep areas
+    %h_rand(icedraft-h<h_rand)=icedraft(icedraft-h<h_rand)-h(icedraft-h<h_rand)
+    h = h + h_rand;
+  end
   
   
   %%% Make sure there are no "holes" along the southern boundary, or MITgcm
@@ -486,7 +486,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   s_bot = 34.65;
   pt_bot = -0.5;
   s_mid = 34.67;
-  pt_mid = 1.5;
+  pt_mid = 1;
   s_surf = 34.15;
   pt_surf = -1.8;
   Zsml = -50;
@@ -494,10 +494,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   % at -1000
   % at -1500
   
-                          %%% be deeper or else you end up with very weak 
-                          %%% buoyancy frequency just below the pycnocline
-  Zcdw_pt_shelf = -550; %%% CDW depth over the shelf
-  Zcdw_pt_South = -450; %%% CDW depth at the southern boundary
+  Zcdw_pt_shelf = experiment_parameters.tcline_atshelf_depth; %%% CDW depth over the shelf
+  Zcdw_pt_South = Zcdw_pt_shelf + experiment_parameters.tcline_deltaz; %%% CDW depth at the southern boundary
 
   lat_Zcdw_pt = [0 Yshelfbreak Ydeep Ly];
   Zcdw_pt_2 = [Zcdw_pt_shelf Zcdw_pt_shelf Zcdw_pt_South Zcdw_pt_South]; %%% Piecewise function
@@ -596,7 +594,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     xlabel('\theta_r_e_f (\circC)');
     ylabel('Depth (m)');
     title('Relaxation temperature');
-    legend('Northern T','Southern T','Position',[0.3200 0.6468 0.3066 0.0738]);
+    %legend('Northern T','Southern T','Position',[0.3200 0.6468 0.3066 0.0738]);
+    legend('Northern T');
     set(gca,'fontsize',fontsize);
     PLOT = gcf;
     PLOT.Position = [644 148 380 562];  
@@ -612,7 +611,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     ylabel('Depth (m)');
 %     ylabel('z','Rotation',0);
     title('Relaxation salinity');
-    legend('Northern S','Southern S','Position',[0.3200 0.6468 0.3066 0.0738]);
+    %legend('Northern S','Southern S','Position',[0.3200 0.6468 0.3066 0.0738]);
+    legend('Northern S');
     set(gca,'fontsize',fontsize);
     PLOT = gcf;
     PLOT.Position = [644 148 380 562];  
@@ -665,7 +665,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     fignum = fignum + 1;
     clf;
     semilogx(N2_north,pp_mid_north,'LineWidth',1.5);axis ij;
-    legend('Northern N^2','Southern N^2','Position',[0.5181 0.6192 0.3313 0.0899]);
+    %legend('Northern N^2','Southern N^2','Position',[0.5181 0.6192 0.3313 0.0899]);
+    legend('Northern N^2');
     xlabel('N^2 (s^-^2)');
     ylabel('Depth (m)');
 %       ylabel('z (km)','Rotation',0);
@@ -737,21 +738,16 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   deltaT_KhT = 0.4*min([dx dy])^2/(4*diffKhT);    
   %%% Time step constraint based on vertical diffusion of temp 
   deltaT_KrT = 0.4*min(dz)^2 / (4*diffKrT);
-  
   %%% Time step size  
   deltaT = min([deltaT_fgw deltaT_gw deltaT_adv deltaT_itl deltaT_Ah deltaT_Ar deltaT_KhT deltaT_KrT deltaT_A4]);
   deltaT = round(deltaT) ;
   nTimeSteps = ceil(simTime/deltaT);
-  simTimeAct = nTimeSteps*deltaT
+  simTimeAct = nTimeSteps*deltaT;
   
   %%% Write end time time step size  
   parm03.addParm('endTime',nIter0*deltaT+simTimeAct,PARM_INT);
   parm03.addParm('deltaT',deltaT,PARM_REAL); 
 
-  
- 
-  
-  
   
   %%%%%%%%%%%%%%%%%%%%%%%%
   %%%%% INITIAL DATA %%%%%
@@ -764,9 +760,16 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   %%% Align initial temp with background
   hydroTh = ones(Nx,Ny,Nr);
   hydroSa = ones(Nx,Ny,Nr);
-  for k=1:1:Nr
-    hydroTh(:,:,k) = squeeze(hydroTh(:,:,k))*tNorth(k);
-    hydroSa(:,:,k) = squeeze(hydroSa(:,:,k))*sNorth(k);
+  if isfield(experiment_parameters,'initial_state') && experiment_parameters.initial_state == "cold"
+    for k=1:1:Nr
+	hydroTh(:,:,k) = squeeze(hydroTh(:,:,k))*tNorth(k);
+	hydroSa(:,:,k) = squeeze(hydroSa(:,:,k))*sNorth(k);
+    end
+  else
+    for k=1:1:Nr
+	hydroTh(:,:,k) = squeeze(hydroTh(:,:,k))*tNorth(k);
+	hydroSa(:,:,k) = squeeze(hydroSa(:,:,k))*sNorth(k);
+    end
   end
   
   %%% Add some random noise  
@@ -781,13 +784,18 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   relaxmask = zeros(Nx,Ny,Nr);
 
   %%relaxmask(:,:,1) = 1;
-  saltflux = false;
+  saltflux = experiment_parameters.saltflux;
   if (saltflux)
     iceidx = find(Y<=Yicefront+10000 & Yicefront<Y & (X<Xtrough+(Xeast-Xwest)/2) & (X>=Xtrough-(Xeast-Xwest)/2));  
     saltfluxvals = zeros(Nx,Ny);
     saltfluxvals(~iceidx) = 0;
     saltfluxfile = 'saltflux.bin';
-    saltfluxvals(iceidx) = 1.078*10^(-6);
+    saltfluxvals(iceidx) = -2.5*10^(-1);
+    if(showplots)
+      pcolor(X,Y,saltfluxvals);
+      shading interp;
+      title("saltflux");
+    end
     %%% Align initial temp with background
     writeDataset(saltfluxvals,fullfile(inputpath,saltfluxfile),ieee,prec); 
     parm05.addParm('saltFluxFile','saltflux.bin',PARM_STR);
@@ -1304,8 +1312,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     end
     relaxmaskFile = 'relaxmask.bin';
     %%%%% TEMPERATURE SETTINGS %%%%%%%%%%%%%5
-    useRBCtemp = true;
-    tauRelaxT = t1day;
+    useRBCtemp = experiment_parameters.rbcs_temp;
+    tauRelaxT = 6*t1hour;
     %%% For initial conditions
     trelaxvalsFile = 'trelaxvals.bin';
     %%% Align initial temp with background
@@ -1315,7 +1323,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
     writeDataset(trelaxvals,fullfile(inputpath,trelaxvalsFile),ieee,prec); 
 
     %%%%%%%%%%%%% SALINITY SETTINGS %%%%%%%%%%%%%%%%5
-    useRBCsalt = true;
+    useRBCsalt = false;
     tauRelaxS = t1day/4.0;
     %%% For initial conditions
     srelaxvalsFile = 'srelaxvals.bin';
@@ -1442,7 +1450,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
   % % % % % %          'Vm_Diss','Vm_Advec','Vm_Cori','Vm_dPhiY','Vm_Ext','Vm_AdvZ3','Vm_AdvRe',...
   % % % % % %          'VISrI_Um','VISrI_Vm',...
   numdiags_avg = length(diag_fields_avg);  
-  diag_freq_avg = t1year/12.0;
+  diag_freq_avg = (t1year/12.0)*experiment_parameters.monitor_freq;
 
   diag_phase_avg = 0;    
       
@@ -1816,8 +1824,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr)
  
   %%% Creates a matlab file defining all input parameters
   write_matlab_params(inputpath,ALL_PARMS,realfmt);
-  
-  save(fullfile(inputpath,'metaparameters.mat'))
+  allvars = whos;
+  tosave = cellfun(@isempty, regexp({allvars.class}, '^matlab\.(ui|graphics)\.'));
+  %save()
+  save(fullfile(inputpath,'metaparameters.mat'), allvars(tosave).name)
 
 end
 

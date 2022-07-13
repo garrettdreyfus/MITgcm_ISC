@@ -19,7 +19,7 @@
 %%% NOTE: 'expname' MUST NOT be set to 'DEFAULTS'
 %%%
 
- function newexp (batch_name,exp_name)
+ function newexp (batch_name,exp_name,experiment_parameters)
 
    
 %    addpath /data/MITgcm_ASF-csi/newexp_utils/;
@@ -77,7 +77,7 @@
   use_mpi = true; %%% set true for parallel processing
   use_pbs = true; %%% set true for execution via PBS
   cluster = 'hoffman2';
-  exclusive=true
+  exclusive=true;
   queue = 'all.q';
   sNx = 16; %%% no. of x-gridpoints per tile
   sNy = 25; %%% no. of y-gridpoints per tile
@@ -231,8 +231,9 @@
   codepath =  fullfile(exppath,codedir);
   inputpath = fullfile(exppath,inputdir);
   resultspath = fullfile(exppath,resultsdir);
-
-  
+  if exist(exppath, 'dir')
+    rmdir(exppath,'s');
+  end
   %%% We have to use MPI if we're using PBS
   if (use_pbs)
     use_mpi = true;    
@@ -246,7 +247,7 @@
   %%% Calculate total grid size and number of nodes
   Nx = sNx*nSx*nPx;
   Ny = sNy*nSy*nPy;
-  nodes = nPx*nPy
+  nodes = nPx*nPy;
 
 
 
@@ -254,12 +255,13 @@
   %%%%% DIRECTORIES %%%%%
   %%%%%%%%%%%%%%%%%%%%%%%
 
-
+  
   %%% Open experiment top-level directory
   [dir_success,dir_msg,dir_msgid] = mkdir(exppath);
   if (dir_success == 0)
     error(strcat(['Could not open ',exp_name,' : ',num2str(dir_msgid),' : ',dir_msg]));
   end
+  
 
   %%% Open sub-directories
   subdirnames = {builddir,codedir,inputdir,resultsdir};
@@ -287,7 +289,7 @@
   end   
 
   %%% Generate experiment input files ('data','data.seaice', etc.)
-  nTimeSteps = setParams(exp_name,inputpath,codepath,listterm,Nx,Ny,Nr);  
+  nTimeSteps = setParams(exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,experiment_parameters);  
 
   %%% Generate 'eedata'
   create_eedata(inputpath,listterm,nTx,nTy);     
@@ -338,7 +340,7 @@
   %%% This seems to provide a decent estimate when OLx is
   %%% comparable to sNx or OLy is comparable to sNy; 'ghost' gridpoints
   %%% require perhaps half as much processing as 'real' gridpoints.
-  comptime = alpha*(sNx+OLx)*(sNy+OLy)*Nr*nTimeSteps
+  comptime = alpha*(sNx+OLx)*(sNy+OLy)*Nr*nTimeSteps;
     
   
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -467,6 +469,8 @@
     'rsync -av --update ',...
     '../',exp_name,' ', ...
     username,'@',clustername,':',clusterdir];
+
+  
   fid = fopen(fullfile(exppath,'upload_to_cluster.sh'),'w');
   if (fid == -1)
     error('Could not open run script for writing');
@@ -481,6 +485,15 @@
     fullfile(clusterdir,exp_name,resultsdir),'/* ', ...
     './results/ \n'];  
   fid = fopen(fullfile(exppath,'download_from_cluster.sh'),'w');
+  if (fid == -1)
+    error('Could not open run script for writing');
+  end
+  fprintf(fid,downcommand);  
+  fclose(fid);
+  
+  remoteruncommand = [...
+		       'ssh ',username,'@',clustername,' '' sh ',clusterdir,'build_and_run.sh '' ' ];
+  fid = fopen(fullfile(exppath,'remote_run.sh'),'w');
   if (fid == -1)
     error('Could not open run script for writing');
   end
