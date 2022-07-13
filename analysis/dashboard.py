@@ -5,56 +5,39 @@ import numpy.matlib
 import matplotlib.pyplot as plt
 from matplotlib.animation import FFMpegFileWriter
 from tqdm import tqdm
+import os
+from pathlib import Path
+import re
 
-
-
-def timeSeriesDashboard(fname,label,fig,axises,times=np.array([])):
-    ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
+def timeSeries(fname):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
-    if times.any():
-        ds = open_mdsdataset(fname,ignore_unknown_vars=True,iters=times,extra_variables = extra_variables)
-    else:
-        times=getIterNums(fname)
-        print(times)
-        ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-    totalvolume  = (ds.XC*ds.YC*ds.Z*ds.hFacC).sum().values
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,prefix=["THETA","SALT","momKE","SHIfwFlx"],ignore_unknown_vars=True,iters=times,extra_variables = extra_variables)
+    totalvolume  = 1#(ds.XC.diff("x")*ds.YC.diff("y")*ds.Z.diff("z")*ds.hFacC).sum().values
     ## theta plot
-
-    ts = ds.time.values*108.0/60.0/60.0/24.0/365.0
+    ts = ds.time.values*grabDeltaT(fname)/60.0/60.0/24.0/365.0
     tsnew = np.full_like(ts,0,dtype=float)
     tsnew[:] = ts
     ts = tsnew
     ts = ts/1000000000
     times=ts
-    totaltheta = (ds.THETA*ds.XC*ds.YC*ds.Z*ds.hFacC).sum(axis=[1,2,3]).values
-    ax1.plot(times,totaltheta/totalvolume,label=label)
-    ax1.set_xlabel("Time")
-    ax1.set_ylabel("Potential Temperature")
-    ax1.legend()
-    ## salt plot
-    totalsalt = (ds.SALT*ds.XC*ds.YC*ds.Z*ds.hFacC).sum(axis=[1,2,3]).values
-    ax2.plot(times,totalsalt/totalvolume,label=label)
-    ax2.set_xlabel("Time")
-    ax2.set_ylabel("Salinity")
-
-    ## kinetic energy plot
-    totalmomke = (ds.momKE*ds.XC*ds.YC*ds.Z*ds.hFacC).sum(axis=[1,2,3]).values
-    ax3.plot(times,totalmomke/totalvolume,label=label)
-    ax3.set_xlabel("Time")
-    ax3.set_ylabel("Kinetic Energy")
-
-    
-    ## kinetic energy plot
-    #totalSHIfwFlx = (ds.SHIfwFlx*ds.XC*ds.YC*ds.Z*ds.hFacC).sum(axis=[1,2,3]).values
+    volume = (ds.hFacC * ds.drF * ds.rA).values
+    volumesum = np.sum(volume)
+    thetas=[]
+    THETA = ds.THETA.values
+    for k in range(ds.THETA.shape[0]):
+        thetas.append((np.sum(THETA[k]*volume))/volumesum)
+    salts = []
+    SALT = ds.SALT.values
+    for k in range(ds.THETA.shape[0]):
+        salts.append((np.sum(SALT[k]*volume))/volumesum)
+    kes = []
+    momKE = ds.momKE.values
+    for k in range(ds.THETA.shape[0]):
+        kes.append((np.sum(momKE[k]*volume))/volumesum)
     mask = ~np.isnan(ds.SHIfwFlx.values)
     shflx = ds.SHIfwFlx.values
-    print(shflx)
-    totalSHIfwFlx = np.sum(shflx*mask,axis=(1,2))*(60*60*24*365)*(1/920.0)*(1/np.sum(mask,axis=(1,2)))
-    print(ds.SHIfwFlx)
-    ax4.plot(times,totalSHIfwFlx,label=label)
-    ax4.set_xlabel("Time")
-    ax4.set_ylabel("Fresh Water Flux")
-    ax6.remove()
+    shiwflxs = np.sum(shflx*mask,axis=(1,2))*(60*60*24*365)*(1/920.0)*(1/np.sum(mask,axis=(1,2)))
 
     bottomtemps = []
     surfacetemps = []
@@ -63,21 +46,100 @@ def timeSeriesDashboard(fname,label,fig,axises,times=np.array([])):
         z[z<0]=0
         z[-1,:,:]=0
         zmask = z
-        X = np.full_like(ds["THETA"][k].values,np.nan,dtype=float)
-        X[ds.hFacC.values != 0]= ds["THETA"][k].values[ds.hFacC.values != 0]
+        X = np.full_like(THETA[k],np.nan,dtype=float)
+        X[ds.hFacC.values != 0]= THETA[k][ds.hFacC.values != 0]
         znew = np.multiply(zmask,X)
         nancount = np.nansum(np.isnan(znew),axis=0)
         znew = np.nansum(znew,axis=0)
         znew[nancount==X.shape[0]] = np.nan
         bottomtemps.append(np.nanmean(znew))
-        surfaceslice = ds["THETA"][k][0,:,:].values
+        surfaceslice = THETA[k][0,:,:]
         surfaceslice[ds.hFacC[0,:,:].values==0]=np.nan
         surfaceslice = np.nanmean(surfaceslice)
         surfacetemps.append(np.nanmean(surfaceslice))
-    ax5.plot(times,bottomtemps,label="Bottom")
-    ax5.plot(times,surfacetemps,label="Surface")
+    return {"ts":np.asarray(ts),"theta":np.asarray(thetas),"salt":np.asarray(salts),"kes":np.asarray(kes),"shiflx":np.asarray(shiwflxs),"bottemp":np.asarray(bottomtemps),"surfacetemp":np.asarray(surfacetemps)}
+
+
+def steadyStateAverage(fname,xval,fig,axises):
+    ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
+    data = timeSeries(fname)
+    for k in data.keys():
+        if k != "ts":
+            data[k] = np.nanmean(data[k][data["ts"]>2.5])
+    ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
+    ax1.scatter(xval,data["theta"])
+    ax1.set_xlabel("Height above HUB")
+    ax1.set_ylabel("Potential Temperature")
+    ## salt plot
+    ax2.scatter(xval,data["salt"])
+    ax2.set_xlabel("Height above HUB")
+    ax2.set_ylabel("Salinity")
+
+    ## kinetic energy plot
+    ax3.scatter(xval,data["kes"])
+    ax3.set_xlabel("Height above HUB")
+    ax3.set_ylabel("Kinetic Energy")
+
+    ax4.scatter(xval,-data["shiflx"])
+    ax4.set_xlabel("Height above HUB")
+    ax4.set_ylabel("Melt Rate m/yr")
+    
+    ## kinetic energy plot
+    #totalSHIfwFlx = (ds.SHIfwFlx*ds.XC*ds.YC*ds.Z*ds.hFacC).sum(axis=[1,2,3]).values
+    bottomtemps = []
+    surfacetemps = []
+
+    ax5.scatter(xval,data["bottemp"])
+    ax6.scatter(xval,data["surfacetemp"])
+    ax5.set_xlabel("Height above HUB")
+    ax5.set_ylabel("Bottom Potential Temperature")
+    ax6.set_xlabel("Height above HUB")
+    ax6.set_ylabel("Surface Potential Temperature")
+    ax1.legend()
+    ax2.legend()
+    ax3.legend()
+    ax4.legend()
+    ax5.legend()
+
+
+def timeSeriesDashboard(fname,label,fig,axises,times=np.array([])):
+    ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
+    data = timeSeries(fname)
+    ax1.plot(data["ts"][data["ts"]>2.5],data["theta"][data["ts"]>2.5],label=label)
+    ax1.set_xlabel("Time")
+    ax1.set_ylabel("Potential Temperature")
+    ax1.legend()
+    ## salt plot
+    color = [l for l in ax1.lines if l._label == label][0]._color
+    ax2.plot(data["ts"][data["ts"]>2.5],data["salt"][data["ts"]>2.5],label=label,c=color)
+    ax2.set_xlabel("Time")
+    ax2.set_ylabel("Salinity")
+
+    ## kinetic energy plot
+    kes = []
+    ax3.plot(data["ts"][data["ts"]>2.5],data["kes"][data["ts"]>2.5],label=label,c=color)
+    ax3.set_xlabel("Time")
+    ax3.set_ylabel("Kinetic Energy")
+
+    ax4.plot(data["ts"][data["ts"]>2.5],data["shiflx"][data["ts"]>2.5])
+    ax4.set_xlabel("Time")
+    ax4.set_ylabel("Melt Rate m/yr")
+    
+    ## kinetic energy plot
+    #totalSHIfwFlx = (ds.SHIfwFlx*ds.XC*ds.YC*ds.Z*ds.hFacC).sum(axis=[1,2,3]).values
+    bottomtemps = []
+    surfacetemps = []
+
+    ax5.plot(data["ts"][data["ts"]>2.5],data["bottemp"][data["ts"]>2.5],label=label + " bottom",c=color)
+    ax6.plot(data["ts"][data["ts"]>2.5],data["surfacetemp"][data["ts"]>2.5],label=label + " surface",c=color)
     ax5.set_xlabel("Time")
-    ax5.set_ylabel("Potential Temperature")
+    ax5.set_ylabel("Bottom Potential Temperature")
+    ax6.set_xlabel("Time")
+    ax6.set_ylabel("Surface Potential Temperature")
+    ax1.legend()
+    ax2.legend()
+    ax3.legend()
+    ax4.legend()
     ax5.legend()
 
 def depthFromdZ(ds):
@@ -92,8 +154,19 @@ def depthFromdZ(ds):
     zmask = z
     return np.sum(zmask*Z,axis=0)
 
+def grabDeltaT(fname):
+    p = Path(fname).parents[0]
+    p = str(p)+"/input/data"
+    with open(p,"rb") as file:
+        for line in file:
+            s = str(line)
+            if "deltaT" in s:
+                result = re.search('=(.*),', s)
+                return float(result.group(1))
 
-def barotropic_streamfunction(fname,description,times=np.array([])):
+
+
+def barotropic_streamfunction(fname,description,times=np.array([]),res=5):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
@@ -104,7 +177,7 @@ def barotropic_streamfunction(fname,description,times=np.array([])):
     UFULL = ds.UVEL.values
     VFULL = ds.VVEL.values
     with moviewriter.saving(fig, fpath+"-bt.mp4" , dpi=250):
-        for k in tqdm(range(0,ds.UVEL.values.shape[0])):
+        for k in tqdm(range(0,ds.UVEL.values.shape[0],res)):
             U = UFULL[k,:,:,:]
             V = VFULL[k,:,:,:]
             fDZ = list(np.diff(ds.Z))
@@ -136,7 +209,6 @@ def meltmap(fname,description,times=np.array([])):
     shortname, fpath = outPath(fname) 
     moviewriter = FFMpegFileWriter(fps=1)
     fig,ax1 = plt.subplots()
-    print(ds)
     mask = np.logical_and(ds.hFacC.values[0]==0,np.sum(ds.hFacC.values,axis=0)!=0)
     with moviewriter.saving(fig, fpath+"-meltmap.mp4" , dpi=250):
         for k in tqdm(range(ds.UVEL.values.shape[0])):
@@ -150,7 +222,6 @@ def meltmap(fname,description,times=np.array([])):
 
 def bottomMask(ds):
     bmask = np.full_like(ds.THETA[0,0,:,:],0,dtype=int)
-    print(ds)
     for k in range(ds.Z.shape[0])[::-1]:
         nanmask = (bmask == 0)
         full_mask = np.full_like(bmask,k,dtype=int)
@@ -164,13 +235,13 @@ def outPath(resultspath):
     fpath = "/".join((nameparts[:-4]+["pics"] + [shortname]))
     return shortname, fpath
 
-def crossSectionAnim(fname,description,times=np.array([]),quant="THETA"):
+def crossSectionAnim(fname,description,times=np.array([]),quant="THETA",res=5):
     fig,ax1 = plt.subplots()
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
-    print(times)
     ds = open_mdsdataset(fname,prefix=quant,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-    ds[quant].values=ds[quant].values*ds.hFacC.values
+    #ds[quant].values=ds[quant].values*ds.hFacC.values
+
     #print(ds.hFacC)
     zonal_average = ds.where(ds.hFacC ==1).mean(dim="XC",skipna=True)
     #zonal_average = ds.mean(dim="XC",skipna=True)
@@ -178,21 +249,19 @@ def crossSectionAnim(fname,description,times=np.array([]),quant="THETA"):
     moviewriter = FFMpegFileWriter(fps=1)
     tmin, tmax = np.nanmin(zonal_average[quant]), np.nanmax(zonal_average[quant])
     shortname, fpath = outPath(fname) 
-    print(shortname,fpath)
     fig.suptitle(shortname)
     ys = zonal_average.YC.values
     zs = zonal_average.Z.values
     zvals = zonal_average[quant].values
     with moviewriter.saving(fig, fpath+".mp4" , dpi=250):
-        print("writing movie")
-        for k in tqdm(range(zonal_average[quant].shape[0])):
+        for k in tqdm(range(0,zonal_average[quant].shape[0],res)):
             frame = ax1.pcolormesh(ys,zs,zvals[k,:,:],cmap="jet",vmin=tmin,vmax=tmax)
             cb = plt.colorbar(frame)
             moviewriter.grab_frame()
             cb.remove()
             frame.remove()
 
-def bottomAnim(fname,description,times=np.array([]),quant="SALT"):
+def bottomAnim(fname,description,times=np.array([]),quant="SALT",res=5):
     fig,ax1 = plt.subplots()
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
@@ -208,8 +277,7 @@ def bottomAnim(fname,description,times=np.array([]),quant="SALT"):
     depth = depthFromdZ(ds)
     quantvals = ds[quant].values
     with moviewriter.saving(fig, fpath+"-bot.mp4", dpi=250):
-        print("writing movie")
-        for k in tqdm([0]+list(range(quantvals.shape[0]))+[-1]):
+        for k in tqdm([0]+list(range(0,quantvals.shape[0],res))+[-1]):
             d = np.mean(quantvals,axis=0)
             X = np.full_like(d,np.nan,dtype=float)
             X[ds.hFacC.values != 0]= d[ds.hFacC.values != 0]
@@ -220,7 +288,6 @@ def bottomAnim(fname,description,times=np.array([]),quant="SALT"):
             frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet",vmin=34.4,vmax=34.65)
             ax1.contour(ds.XC.values,ds.YC.values,depth,colors="black",levels=20)
             cb = plt.colorbar(frame)
-            plt.show()
             moviewriter.grab_frame()
             cb.remove()
             frame.remove()
@@ -242,7 +309,6 @@ def surfaceAnim(fname,description,times=np.array([]),quant="SALT"):
     depth = depthFromdZ(ds)
     quantvals = ds[quant].values
     with moviewriter.saving(fig, fpath+"-surf.mp4", dpi=250):
-        print("writing movie")
         for k in tqdm([0]+list(range(0,quantvals.shape[0]))+[-1]):
             X = np.full_like(quantvals[k],np.nan,dtype=float)
             X[ds.hFacC.values != 0]= quantvals[k][ds.hFacC.values != 0]
@@ -273,60 +339,38 @@ def getIterNums(fpath):
 
 #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish/test/results","Restricted y domain length with default settings",times = np.asarray(range(1,9))*420480)
 #fig,axises = plt.subplots(2,3)
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","2O-r",fig,axises)
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","PIG",fig,axises)
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","2O",fig,axises)
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","steep",fig,axises)
+#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200",fig,axises)
+#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/midunder/results","-100",fig,axises)
+##timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus50/results","-50",fig,axises)
+#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus25/results","-25",fig,axises)
+#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","0",fig,axises)
+##timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results","+150",fig,axises)
 #plt.show()
 
+fig,axises = plt.subplots(2,3)
+steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results",-200,fig,axises)
+steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/midunder/results",-100,fig,axises)
+steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus50/results",-50,fig,axises)
+steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus25/results",-25,fig,axises)
+steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results",0,fig,axises)
+steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results",+150,fig,axises)
+plt.show()
 #meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings")
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings")
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings")
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings")
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings")
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/fully/under/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-test/at/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","Restricted y domain length with default settings",quant="SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/at/results","Restricted y domain length with default settings",quant="SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/crashtest1/results","Restricted y domain length with default settings",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/crashtest-orlanskiw/results","Restricted y domain length with default settings",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-w/at-4/results","Restricted y domain length with default settings",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-w/warm-bland-2/results","Restricted y domain length with default settings",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/tcline-at-glib-ct2/results","Restricted y domain length with default settings",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-w/at-4/results","Restricted y domain length with default settings",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-w/at/results","Restricted y domain length with default settings",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/under/results","Restricted y domain length with default settings",quant="SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","Restricted y domain length with default settings")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings")
+
+#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results","+150")
+#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","at")
+#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200")
+#("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings")
+
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results","+150")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","at")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/midunder/results","-100")
 
 # fig,axises = plt.subplots(2,2)
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","under",fig,axises)
 # plt.show()
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/crashtest1/results","Restricted y domain length with default settings")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/crashtest-orlanskiw/results","Restricted y domain length with default settings")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/tcline-at-glib/results","Restricted y domain length with default settings")
-bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings",quant="SALT")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings",quant="THETA")
+bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results","+150")
+bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","at")
+bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200")
 
-#surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings",quant="THETA")
-#surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O/results","Restricted y domain length with default settings",quant="THETA")
-#surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-2O-rand/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/at/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/above/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/orlanski-w/warm-bland/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/randtopo/tcline-at-glib-ct2/results","Restricted y domain length with default settings",quant="THETA")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish_polyna/at/results","Restricted y domain length with default settings")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/squish_polyna/above/results","Restricted y domain length with default settings")
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Lower thermocline 4km resolution")
