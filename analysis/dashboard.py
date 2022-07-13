@@ -277,8 +277,8 @@ def bottomAnim(fname,description,times=np.array([]),quant="SALT",res=5):
     depth = depthFromdZ(ds)
     quantvals = ds[quant].values
     with moviewriter.saving(fig, fpath+"-bot.mp4", dpi=250):
-        for k in tqdm([0]+list(range(0,quantvals.shape[0],res))+[-1]):
-            d = np.mean(quantvals,axis=0)
+        for k in tqdm([0]+list(range(quantvals.shape[0]))+[-1]):
+            d = quantvals[k]
             X = np.full_like(d,np.nan,dtype=float)
             X[ds.hFacC.values != 0]= d[ds.hFacC.values != 0]
             znew = np.multiply(zmask,X)
@@ -316,7 +316,7 @@ def surfaceAnim(fname,description,times=np.array([]),quant="SALT"):
             nancount = np.nansum(np.isnan(znew),axis=0)
             znew = np.nansum(znew,axis=0)
             znew[nancount==X.shape[0]] = np.nan
-            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet",vmin=-2,vmax=1)
+            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet")
             ax1.contour(ds.XC.values,ds.YC.values,depth,colors="black",levels=20)
             cb = plt.colorbar(frame)
             moviewriter.grab_frame()
@@ -337,14 +337,13 @@ def getIterNums(fpath):
             saltiters.append(n)
     return np.unique(np.asarray(np.intersect1d(iters,saltiters)))[:-1]
 
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish/test/results","Restricted y domain length with default settings",times = np.asarray(range(1,9))*420480)
+fig,axises = plt.subplots(2,3)
+timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/up/results","up",fig,axises)
+plt.show()
+
 #fig,axises = plt.subplots(2,3)
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200",fig,axises)
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/midunder/results","-100",fig,axises)
-##timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus50/results","-50",fig,axises)
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus25/results","-25",fig,axises)
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","0",fig,axises)
-##timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results","+150",fig,axises)
+#for k in [-200, -125, -50, 0, 50, 125, 200]:
+#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at"+str(k)+"/results",str(k),fig,axises)
 #plt.show()
 
 fig,axises = plt.subplots(2,3)
@@ -356,21 +355,12 @@ steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/a
 steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results",+150,fig,axises)
 plt.show()
 #meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings")
-
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results","+150")
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","at")
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200")
-#("/home/garrett/Projects/MITgcm_ISC/experiments/tcline/under/results","Restricted y domain length with default settings")
-
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results","+150")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","at")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/midunder/results","-100")
-
+#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings")
+surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/up/results","Restricted y domain length with default settings","SALT")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/up/results","Restricted y domain length with default settings")
 # fig,axises = plt.subplots(2,2)
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","under",fig,axises)
 # plt.show()
 bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results","+150")
 bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","at")
 bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200")
-
