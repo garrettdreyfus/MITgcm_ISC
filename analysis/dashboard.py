@@ -23,47 +23,39 @@ def timeSeries(fname):
     ts = tsnew
     ts = ts/1000000000
     times=ts
+    yice = grabMatVars(fname,("Yicefront"))["Yicefront"][0][0]
+    cavity = ds.where(ds.YC<yice,drop=True)
     volume = (ds.hFacC * ds.drF * ds.rA).values
+    cavvolume = (cavity.hFacC * cavity.drF * cavity.rA).values
     volumesum = np.sum(volume)
+    cavvolumesum = np.sum(cavvolume)
     thetas=[]
-    THETA = ds.THETA.values
-    for k in range(ds.THETA.shape[0]):
-        thetas.append((np.sum(THETA[k]*volume))/volumesum)
+    THETA = cavity.THETA.values
+    for k in range(cavity.THETA.shape[0]):
+        thetas.append((np.sum(THETA[k]*cavvolume))/cavvolumesum)
     salts = []
-    SALT = ds.SALT.values
-    for k in range(ds.THETA.shape[0]):
-        salts.append((np.sum(SALT[k]*volume))/volumesum)
+    SALT = cavity.SALT.values
+    for k in range(cavity.THETA.shape[0]):
+        salts.append((np.sum(SALT[k]*cavvolume))/cavvolumesum)
     kes = []
-    momKE = ds.momKE.values
-    for k in range(ds.THETA.shape[0]):
-        kes.append((np.sum(momKE[k]*volume))/volumesum)
+    momKE = cavity.momKE.values
+    for k in range(cavity.THETA.shape[0]):
+        kes.append((np.sum(momKE[k]*cavvolume))/cavvolumesum)
     mask = ~np.isnan(ds.SHIfwFlx.values)
     shflx = ds.SHIfwFlx.values
     shiwflxs = np.sum(shflx*mask,axis=(1,2))*(60*60*24*365)*(1/920.0)*(1/np.sum(mask,axis=(1,2)))
 
-    bottomtemps = []
-    surfacetemps = []
-    for k in range(ds["THETA"].shape[0]):
-        z = np.concatenate((ds.hFacC.values[:-1,:,:]-ds.hFacC.values[1:,:,:],ds.hFacC[-1:,:,:]),axis=0)
-        z[z<0]=0
-        z[-1,:,:]=0
-        zmask = z
-        X = np.full_like(THETA[k],np.nan,dtype=float)
-        X[ds.hFacC.values != 0]= THETA[k][ds.hFacC.values != 0]
-        znew = np.multiply(zmask,X)
-        nancount = np.nansum(np.isnan(znew),axis=0)
-        znew = np.nansum(znew,axis=0)
-        znew[nancount==X.shape[0]] = np.nan
-        bottomtemps.append(np.nanmean(znew))
-        surfaceslice = THETA[k][0,:,:]
-        surfaceslice[ds.hFacC[0,:,:].values==0]=np.nan
-        surfaceslice = np.nanmean(surfaceslice)
-        surfacetemps.append(np.nanmean(surfaceslice))
+    bottomtemps = thetas    # print(bottomtemps.shape)
+    surfacetemps = thetas
     return {"ts":np.asarray(ts),"theta":np.asarray(thetas),"salt":np.asarray(salts),"kes":np.asarray(kes),"shiflx":np.asarray(shiwflxs),"bottemp":np.asarray(bottomtemps),"surfacetemp":np.asarray(surfacetemps)}
 
-def intTemp(depth,fname):
+def grabMatVars(fname,val_tup):
     one_up = os.path.dirname(fname)
-    variables = scipy.io.loadmat(one_up+"/input/metaparameters.mat",variable_names=('tNorth','zz'))
+    variables = scipy.io.loadmat(one_up+"/input/metaparameters.mat",variable_names=val_tup)
+    return variables
+
+def intTemp(depth,fname):
+    variables = grabMatVars(fname,('tNorth','zz'))
     tNorth = np.asarray(variables["tNorth"])[0]+1.8
     zz = np.asarray(variables["zz"])[0]
     f_interp = lambda xx: np.interp(xx, zz[::-1], tNorth[::-1])
@@ -71,17 +63,16 @@ def intTemp(depth,fname):
     print(result)
     return result
 
-
-
 def steadyStateAverage(fname,xval,fig,axises,color="blue"):
-    ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
+    ((ax1,ax2,ax5,ax7),(ax3,ax4,ax6,ax8)) = axises 
     data = timeSeries(fname)
     for k in data.keys():
         if k != "ts":
             data[k] = np.nanmean(data[k][data["ts"]>2.5])
-
-    print(xval,-data["shiflx"])
-    ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
+    variables = grabMatVars(fname,("Hshelf","randtopog_height","Zcdw_pt_shelf"))
+    shelf_depth = variables["Hshelf"]
+    randtopog_height = variables["randtopog_height"]
+    tcline_height = variables["Zcdw_pt_shelf"]
     ax1.scatter(xval,data["theta"],c=color)
     ax1.set_xlabel("Height above HUB")
     ax1.set_ylabel("Potential Temperature")
@@ -105,16 +96,17 @@ def steadyStateAverage(fname,xval,fig,axises,color="blue"):
     surfacetemps = []
 
     ax5.scatter(xval,data["bottemp"],c=color)
-    ax6.scatter(xval,data["surfacetemp"],c=color)
+    #ax6.scatter(xval,data["surfacetemp"],c=color)
     ax5.set_xlabel("Height above HUB")
     ax5.set_ylabel("Bottom Potential Temperature")
-    ax6.set_xlabel("Height above HUB")
-    ax6.set_ylabel("Surface Potential Temperature")
-    ax1.legend()
-    ax2.legend()
-    ax3.legend()
-    ax4.legend()
-    ax5.legend()
+    #ax6.set_xlabel("Height above HUB")
+    #ax6.set_ylabel("Surface Potential Temperature")
+    ax7.scatter(shelf_depth,randtopog_height,c=color)
+    ax7.set_xlabel("Depth of shelf before random perturbation")
+    ax7.set_ylabel("Random perturbation amplitude")
+    ax8.scatter(tcline_height,-data["shiflx"],c=color)
+    ax8.set_xlabel("Depth of thermocline")
+    ax8.set_ylabel("Melt Rate m/yr")
 
 
 def timeSeriesDashboard(fname,label,fig,axises,times=np.array([])):
@@ -363,7 +355,7 @@ def getIterNums(fpath):
         #print("nope",k)
 #plt.show()
 
-fig,axises = plt.subplots(2,3)
+fig,axises = plt.subplots(2,4)
 for k in [-200, -125, -50, 0, 50, 125, 200]:
     steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at"+str(k)+"/results",k,fig,axises,color="red")
 
