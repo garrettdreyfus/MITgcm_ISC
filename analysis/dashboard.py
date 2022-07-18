@@ -8,6 +8,8 @@ from tqdm import tqdm
 import os
 from pathlib import Path
 import re
+import scipy
+from scipy.integrate import quad
 
 def timeSeries(fname):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
@@ -58,6 +60,17 @@ def timeSeries(fname):
         surfaceslice = np.nanmean(surfaceslice)
         surfacetemps.append(np.nanmean(surfaceslice))
     return {"ts":np.asarray(ts),"theta":np.asarray(thetas),"salt":np.asarray(salts),"kes":np.asarray(kes),"shiflx":np.asarray(shiwflxs),"bottemp":np.asarray(bottomtemps),"surfacetemp":np.asarray(surfacetemps)}
+
+def intTemp(depth,fname):
+    one_up = os.path.dirname(fname)
+    variables = scipy.io.loadmat(one_up+"/input/metaparameters.mat",variable_names=('tNorth','zz'))
+    tNorth = np.asarray(variables["tNorth"])[0]+1.8
+    zz = np.asarray(variables["zz"])[0]
+    f_interp = lambda xx: np.interp(xx, zz[::-1], tNorth[::-1])
+    result = quad(f_interp,depth,0, points = zz[::-1])[0]
+    print(result)
+    return result
+
 
 
 def steadyStateAverage(fname,xval,fig,axises,color="blue"):
@@ -237,7 +250,7 @@ def outPath(resultspath):
     fpath = "/".join((nameparts[:-4]+["pics"] + [shortname]))
     return shortname, fpath
 
-def crossSectionAnim(fname,description,times=np.array([]),quant="THETA",res=5):
+def crossSectionAnim(fname,description,times=np.array([]),quant="THETA",res=1):
     fig,ax1 = plt.subplots()
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
@@ -312,13 +325,14 @@ def surfaceAnim(fname,description,times=np.array([]),quant="SALT"):
     quantvals = ds[quant].values
     with moviewriter.saving(fig, fpath+"-surf.mp4", dpi=250):
         for k in tqdm([0]+list(range(0,quantvals.shape[0]))+[-1]):
-            X = np.full_like(quantvals[k],np.nan,dtype=float)
-            X[ds.hFacC.values != 0]= quantvals[k][ds.hFacC.values != 0]
-            znew = np.multiply(zmask,X)
-            nancount = np.nansum(np.isnan(znew),axis=0)
-            znew = np.nansum(znew,axis=0)
-            znew[nancount==X.shape[0]] = np.nan
-            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet")
+            #X = np.full_like(quantvals[k],np.nan,dtype=float)
+            #X[ds.hFacC.values != 0]= quantvals[k][ds.hFacC.values != 0]
+            #znew = np.multiply(zmask,X)
+            #nancount = np.nansum(np.isnan(znew),axis=0)
+            #znew = np.nansum(znew,axis=0)
+            #znew[nancount==X.shape[0]] = np.nan
+            znew = quantvals[k][0,:,:]
+            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet",vmin=30)
             ax1.contour(ds.XC.values,ds.YC.values,depth,colors="black",levels=20)
             cb = plt.colorbar(frame)
             moviewriter.grab_frame()
@@ -341,7 +355,6 @@ def getIterNums(fpath):
 
 # fig,axises = plt.subplots(2,3)
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/up/results","up",fig,axises)
-# plt.show()
 #fig,axises = plt.subplots(2,3)
 #for k in [-200, -125, -50, 0, 50, 125, 200]:
     #try:
@@ -373,13 +386,23 @@ steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/m
 steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results",0,fig,axises)
 steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results",+150,fig,axises)
 plt.show()
+
+# fig,axises = plt.subplots(2,3)
+# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results",-200,fig,axises)
+# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/midunder/results",-100,fig,axises)
+# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus50/results",-50,fig,axises)
+# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus25/results",-25,fig,axises)
+# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results",0,fig,axises)
+# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results",+150,fig,axises)
+# plt.show()
 #meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings")
 #barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings")
-surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/up/results","Restricted y domain length with default settings","SALT")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/up/results","Restricted y domain length with default settings")
+surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/above/results","Restricted y domain length with default settings","SALT")
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/above/results","Restricted y domain length with default settings",quant="THETA")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at-200/results","Restricted y domain length with default settings",quant="SALT")
 # fig,axises = plt.subplots(2,2)
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","under",fig,axises)
 # plt.show()
-bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results","+150")
-bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","at")
-bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at-200/results","+150")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","at")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200")
