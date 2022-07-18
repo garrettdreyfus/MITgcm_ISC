@@ -60,27 +60,29 @@ def timeSeries(fname):
     return {"ts":np.asarray(ts),"theta":np.asarray(thetas),"salt":np.asarray(salts),"kes":np.asarray(kes),"shiflx":np.asarray(shiwflxs),"bottemp":np.asarray(bottomtemps),"surfacetemp":np.asarray(surfacetemps)}
 
 
-def steadyStateAverage(fname,xval,fig,axises):
+def steadyStateAverage(fname,xval,fig,axises,color="blue"):
     ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
     data = timeSeries(fname)
     for k in data.keys():
         if k != "ts":
             data[k] = np.nanmean(data[k][data["ts"]>2.5])
+
+    print(xval,-data["shiflx"])
     ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
-    ax1.scatter(xval,data["theta"])
+    ax1.scatter(xval,data["theta"],c=color)
     ax1.set_xlabel("Height above HUB")
     ax1.set_ylabel("Potential Temperature")
     ## salt plot
-    ax2.scatter(xval,data["salt"])
+    ax2.scatter(xval,data["salt"],c=color)
     ax2.set_xlabel("Height above HUB")
     ax2.set_ylabel("Salinity")
 
     ## kinetic energy plot
-    ax3.scatter(xval,data["kes"])
+    ax3.scatter(xval,data["kes"],c=color)
     ax3.set_xlabel("Height above HUB")
     ax3.set_ylabel("Kinetic Energy")
 
-    ax4.scatter(xval,-data["shiflx"])
+    ax4.scatter(xval,-data["shiflx"],c=color)
     ax4.set_xlabel("Height above HUB")
     ax4.set_ylabel("Melt Rate m/yr")
     
@@ -89,8 +91,8 @@ def steadyStateAverage(fname,xval,fig,axises):
     bottomtemps = []
     surfacetemps = []
 
-    ax5.scatter(xval,data["bottemp"])
-    ax6.scatter(xval,data["surfacetemp"])
+    ax5.scatter(xval,data["bottemp"],c=color)
+    ax6.scatter(xval,data["surfacetemp"],c=color)
     ax5.set_xlabel("Height above HUB")
     ax5.set_ylabel("Bottom Potential Temperature")
     ax6.set_xlabel("Height above HUB")
@@ -337,14 +339,31 @@ def getIterNums(fpath):
             saltiters.append(n)
     return np.unique(np.asarray(np.intersect1d(iters,saltiters)))[:-1]
 
-fig,axises = plt.subplots(2,3)
-timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/up/results","up",fig,axises)
-plt.show()
-
+# fig,axises = plt.subplots(2,3)
+# timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/up/results","up",fig,axises)
+# plt.show()
 #fig,axises = plt.subplots(2,3)
 #for k in [-200, -125, -50, 0, 50, 125, 200]:
-#timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at"+str(k)+"/results",str(k),fig,axises)
+    #try:
+        #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-18/at"+str(k)+"/results",str(k),fig,axises)
+    #except:
+        #print("nope",k)
 #plt.show()
+
+fig,axises = plt.subplots(2,3)
+for k in [-200, -125, -50, 0, 50, 125, 200]:
+    steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at"+str(k)+"/results",k,fig,axises,color="red")
+
+for k in [-200, -125, -50, 0, 50, 125, 200]:
+    try:
+        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="green")
+    except:
+        print("nope",k)
+#plt.show()
+#fig,axises = plt.subplots(2,3)
+for k in [-200, -100, -50, -25, 0, 150]:
+    steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at"+str(k)+"/results",k,fig,axises,color="blue")
+plt.show()
 
 fig,axises = plt.subplots(2,3)
 steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results",-200,fig,axises)
