@@ -50,24 +50,33 @@ def timeSeries(fname):
     surfacetemps = thetas
     return {"ts":np.asarray(ts),"theta":np.asarray(thetas),"salt":np.asarray(salts),"kes":np.asarray(kes),"shiflx":np.asarray(shiwflxs),"bottemp":np.asarray(bottomtemps),"surfacetemp":np.asarray(surfacetemps)}
 
-def grabMatVars(fname,val_tup):
+def matVarsFile(fname):
     one_up = os.path.dirname(fname)
-    variables = scipy.io.loadmat(one_up+"/input/metaparameters.mat",variable_names=val_tup)
+    return one_up+"/input/metaparameters.mat"
+
+def grabMatVars(fname,val_tup):
+    variables = scipy.io.loadmat(matVarsFile(fname),variable_names=val_tup)
     return variables
 
 def intTemp(depth,fname):
-    variables = grabMatVars(fname,('tNorth','zz'))
-    tNorth = np.asarray(variables["tNorth"])[0]+1.8
+    variables = grabMatVars(fname,('tNorth','tEast','zz'))
+    tEast = np.asarray(variables["tEast"])#[0]+1.8
+    #tEast = tEast[int(tEast.shape[0]*(5/6))]+1.8
+    tEast = tEast[-1]+1.8
+    #tNorth = np.asarray(variables["tNorth"])[0]+1.8
     zz = np.asarray(variables["zz"])[0]
-    f_interp = lambda xx: np.interp(xx, zz[::-1], tNorth[::-1])
+    f_interp = lambda xx: np.interp(xx, zz[::-1], tEast[::-1])
     print(depth)
     result = quad(f_interp,depth,min(depth+200,0), points = zz[::-1])[0]
     print(result/(min(200,abs(depth))))
-    return result
+    return result/(min(200,abs(depth)))
+
+#def theAndrewFactio
 
 def steadyStateAverage(fname,xval,fig,axises,color="blue"):
     ((ax1,ax2,ax5,ax7),(ax3,ax4,ax6,ax8)) = axises 
     data = timeSeries(fname)
+    xval = intTemp(GLIBfromFile(matVarsFile(fname)),fname)
     for k in data.keys():
         if k != "ts":
             data[k] = np.nanmean(data[k][data["ts"]>2.5])
@@ -358,10 +367,10 @@ def getIterNums(fpath):
         #print("nope",k)
 #plt.show()
 
-bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at-200/results","Restricted y domain length with default settings","SALT")
-bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at-200/results","Restricted y domain length with default settings","SALT")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
+# bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at-200/results","Restricted y domain length with default settings","SALT")
+# bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
+# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at-200/results","Restricted y domain length with default settings","SALT")
+# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
 
 fig,axises = plt.subplots(2,4)
 for k in [-200, -125, -50, 0, 50, 125, 200]:
@@ -372,30 +381,26 @@ for k in [-200, -125, -50, 0, 50, 125, 200]:
         steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="green")
     except:
         print("nope",k)
-for k in [-200, -100, -50, -25, 0, 150]:
+for k in [-200, -125, -50, 0, 50, 125, 200]:
     try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at"+str(k)+"/results",k,fig,axises,color="blue")
+        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="blue")
     except:
         print("nope",k)
-plt.show()
+for k in [-200, -125, -50, 0, 50, 125, 200]:
+    try:
+        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="orange")
+    except:
+        print("nope",k)
 
-# fig,axises = plt.subplots(2,3)
-# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results",-200,fig,axises)
-# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/midunder/results",-100,fig,axises)
-# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus50/results",-50,fig,axises)
-# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus25/results",-25,fig,axises)
-# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results",0,fig,axises)
-# steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results",+150,fig,axises)
-# plt.show()
-#meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG/results","Restricted y domain length with default settings")
-#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/reference/PIG-steep/results","Restricted y domain length with default settings")
-surfaceAnim("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/above/results","Restricted y domain length with default settings","SALT")
-bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/above/results","Restricted y domain length with default settings","SALT")
-crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/above/results","Restricted y domain length with default settings",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at-200/results","Restricted y domain length with default settings",quant="SALT")
-# fig,axises = plt.subplots(2,2)
-# timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/squish-polyna/above/results","under",fig,axises)
-# plt.show()
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at-200/results","+150")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results","at")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results","-200")
+for k in [-200, -125, -50, 0, 50, 125, 200]:
+    try:
+        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="gray")
+    except:
+        print("nope",k)
+
+# for k in [-200, -100, -50, -25, 0, 150]:
+#     try:
+#         steadyStateAverage("/run/media/garrett/037e02f0-d92c-4b5e-8415-f3f936191171/experiments/GLIB-explore/at"+str(k)+"/results",k,fig,axises,color="purple")
+#     except:
+#         print("nope",k)
+plt.show()
