@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import scipy
 from scipy.integrate import quad
+from matlabglib import GLIBfromFile
 
 def timeSeries(fname):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
@@ -371,34 +372,11 @@ for k in [-200, -125, -50, 0, 50, 125, 200]:
         steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="green")
     except:
         print("nope",k)
-for k in [-200, -125, -50, 0, 50, 125, 200]:
-    try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="purple")
-    except:
-        print("nope",k)
-for k in [ -125, 0, 125]:
-    try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="orange")
-    except:
-        print("nope",k)
-for k in [ -125, 0, 125]:
-    try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="gray")
-    except:
-        print("nope",k)
-#plt.show()
-#fig,axises = plt.subplots(2,3)
 for k in [-200, -100, -50, -25, 0, 150]:
-    steadyStateAverage("/run/media/garrett/037e02f0-d92c-4b5e-8415-f3f936191171/experiments/GLIB-explore/at"+str(k)+"/results",k,fig,axises,color="blue")
-plt.show()
-
-fig,axises = plt.subplots(2,3)
-steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/under/results",-200,fig,axises)
-steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/midunder/results",-100,fig,axises)
-steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus50/results",-50,fig,axises)
-steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/minus25/results",-25,fig,axises)
-steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at/results",0,fig,axises)
-steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/up/results",+150,fig,axises)
+    try:
+        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore/at"+str(k)+"/results",k,fig,axises,color="blue")
+    except:
+        print("nope",k)
 plt.show()
 
 # fig,axises = plt.subplots(2,3)
