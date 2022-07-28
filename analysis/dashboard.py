@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import scipy
 from scipy.integrate import quad
+from matlabglib import GLIBfromFile
 
 def timeSeries(fname):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))

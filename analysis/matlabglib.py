@@ -68,28 +68,41 @@ def calcMSD(depth,ice,slice_depth,resolution=5):
     #plt.show()
     return MSD
 
+
+def GLIBfromFile(fname):
+    variables = scipy.io.loadmat(fname,variable_names=('h','icedraft'))
+    icedraft = np.asarray(variables["icedraft"])
+    h = np.asarray(variables["h"])
+    icedraft[icedraft==0] = np.nan
+    icedraft[h==0] = 0
+    GLIB = generateBedmapGLIBs(h,icedraft)
+    GLIB[np.asarray(GLIB-h)<10] = np.nan
+    return np.nanmean(GLIB[icedraft==np.nanmin(icedraft)])
+
+#print(GLIBfromFile('../experiments/smallerslope-GLIB-explore-18/at-125/input/metaparameters.mat'))
+
 #variables = scipy.io.loadmat('../experiments/GLIB-explore/under/input/metaparameters.mat',variable_names=('h','icedraft'))
-variables = scipy.io.loadmat('../experiments/smallerslope-GLIB-explore-18/at-125/input/metaparameters.mat',variable_names=('h','icedraft'))
-icedraft = np.asarray(variables["icedraft"])
-h = np.asarray(variables["h"])
-plt.imshow(h)
-plt.show()
-icedraft[icedraft==0] = np.nan
-icedraft[h==0] = 0
+# variables = scipy.io.loadmat('../experiments/smallerslope-GLIB-explore-18/at-125/input/metaparameters.mat',variable_names=('h','icedraft'))
+# icedraft = np.asarray(variables["icedraft"])
+# h = np.asarray(variables["h"])
+# plt.imshow(h)
+# plt.show()
+# icedraft[icedraft==0] = np.nan
+# icedraft[h==0] = 0
 
-plt.imshow(icedraft==np.nanmin(icedraft))
-plt.show()
+# plt.imshow(icedraft==np.nanmin(icedraft))
+# plt.show()
 
 
-GLIB = generateBedmapGLIBs(h,icedraft)
-#MSD = calcMSD(h,icedraft,-500)
-#MSD = calcMSD(h,icedraft,-200)
+# GLIB = generateBedmapGLIBs(h,icedraft)
+# #MSD = calcMSD(h,icedraft,-500)
+# #MSD = calcMSD(h,icedraft,-200)
 
-randomcmap = matplotlib.colors.ListedColormap(np.random.rand ( 256,3))
-GLIB[np.asarray(GLIB-h)<10] = np.nan
-print(np.nanmean(GLIB[icedraft==np.nanmin(icedraft)]))
-plt.imshow(GLIB,cmap="jet")#,cmap=randomcmap)
-plt.colorbar()
+# randomcmap = matplotlib.colors.ListedColormap(np.random.rand ( 256,3))
+# GLIB[np.asarray(GLIB-h)<10] = np.nan
+# print(np.nanmean(GLIB[icedraft==np.nanmin(icedraft)]))
+# plt.imshow(GLIB,cmap="jet")#,cmap=randomcmap)
+# plt.colorbar()
 
-plt.show()
+# plt.show()
 
