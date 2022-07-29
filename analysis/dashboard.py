@@ -397,6 +397,17 @@ for k in [-200, -125, -50, 0, 50, 125, 200]:
         steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="gray")
     except:
         print("nope",k)
+for k in [-200, -125, -50, 0, 50, 125, 200]:
+    try:
+        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/smallerslope-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="pink")
+    except:
+        print("nope",k)
+
+for k in [-200, -125, -50, 0, 50, 125, 200]:
+    try:
+        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="black")
+    except:
+        print("nope",k)
 
 # for k in [-200, -100, -50, -25, 0, 150]:
 #     try:
