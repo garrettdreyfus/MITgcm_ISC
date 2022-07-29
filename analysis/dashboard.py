@@ -59,24 +59,32 @@ def grabMatVars(fname,val_tup):
     return variables
 
 def intTemp(depth,fname):
-    variables = grabMatVars(fname,('tNorth','tEast','zz'))
-    tEast = np.asarray(variables["tEast"])#[0]+1.8
-    #tEast = tEast[int(tEast.shape[0]*(5/6))]+1.8
-    tEast = tEast[-1]+1.8
-    #tNorth = np.asarray(variables["tNorth"])[0]+1.8
-    zz = np.asarray(variables["zz"])[0]
-    f_interp = lambda xx: np.interp(xx, zz[::-1], tEast[::-1])
     print(depth)
+    variables = grabMatVars(fname,('tNorth','tEast','zz',''))
+    tEast = np.asarray(variables["tEast"])#[0]+1.8
+    zz = np.asarray(variables["zz"])[0]
+    tEast = tEast[int(tEast.shape[0]*(5/6))]+1.8
+    f_interp = lambda xx: np.interp(xx, zz[::-1], tEast[::-1])
+    results = []
+    ls = []
     result = quad(f_interp,depth,min(depth+200,0), points = zz[::-1])[0]
-    print(result/(min(200,abs(depth))))
-    return result/(min(200,abs(depth)))
+    return result
 
-#def theAndrewFactio
+def AndrewsMetric(zglib,fname):
+    variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft',))
+
+    zpyc = np.asarray(variables["Zcdw_pt_shelf"])[0][0]
+    icedraft = np.asarray(variables["icedraft"])
+    zgl = np.nanmin(icedraft)
+    print(zglib,zpyc,zgl)
+    return (zpyc-zglib)*(zpyc-zgl)
 
 def steadyStateAverage(fname,xval,fig,axises,color="blue"):
     ((ax1,ax2,ax5,ax7),(ax3,ax4,ax6,ax8)) = axises 
     data = timeSeries(fname)
-    xval = intTemp(GLIBfromFile(matVarsFile(fname)),fname)
+    glib = GLIBfromFile(matVarsFile(fname))
+    #xval = intTemp(glib,fname)
+    xval = AndrewsMetric(glib,fname)
     for k in data.keys():
         if k != "ts":
             data[k] = np.nanmean(data[k][data["ts"]>2.5])
