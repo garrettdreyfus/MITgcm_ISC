@@ -3,6 +3,7 @@ import glob
 from xmitgcm import open_mdsdataset
 import numpy.matlib 
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib.animation import FFMpegFileWriter
 from tqdm import tqdm
 import os
@@ -12,10 +13,12 @@ import scipy
 from scipy.integrate import quad
 from matlabglib import GLIBfromFile
 
+matplotlib.use("TkAgg")
+
 def timeSeries(fname):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
-    ds = open_mdsdataset(fname,prefix=["THETA","SALT","momKE","SHIfwFlx"],ignore_unknown_vars=True,iters=times,extra_variables = extra_variables)
+    ds = open_mdsdataset(fname,prefix=["THETA","SALT","momKE","SHIfwFlx","VVEL"],ignore_unknown_vars=True,iters=times,extra_variables = extra_variables)
     totalvolume  = 1#(ds.XC.diff("x")*ds.YC.diff("y")*ds.Z.diff("z")*ds.hFacC).sum().values
     ## theta plot
     ts = ds.time.values*grabDeltaT(fname)/60.0/60.0/24.0/365.0
@@ -42,13 +45,26 @@ def timeSeries(fname):
     momKE = cavity.momKE.values
     for k in range(cavity.THETA.shape[0]):
         kes.append((np.sum(momKE[k]*cavvolume))/cavvolumesum)
+    incavity = []
+    vvel = ds.VVEL.values
+    frontmask = ds.hFacC[:,np.nanargmin(np.abs(ds.VVEL.YG-yice)),:]==0
+    sliceindex=np.nanargmin(np.abs(ds.VVEL.YG-yice))
+    for k in range(ds.THETA.shape[0]):
+        vvelcross = vvel[k,:,sliceindex,:]
+        vvelcross[frontmask]=np.nan
+        incavity.append(np.nansum(vvelcross[vvelcross<0]))
     mask = ~np.isnan(ds.SHIfwFlx.values)
     shflx = ds.SHIfwFlx.values
-    shiwflxs = np.sum(shflx*mask,axis=(1,2))*(60*60*24*365)*(1/920.0)*(1/np.sum(mask,axis=(1,2)))
-
+    shiwflxs = []
+    for k in range(shflx.shape[0]):
+        shiwflxs.append(np.mean(shflx[k][shflx[k]!=0])*(60*60*24*365)*(1/920.0))
+    avgbts = barotropic_streamfunction_max(fname)
+    print(incavity)
+    #np.sum(shflx*mask,axis=(1,2))*(60*60*24*365)*(1/920.0)*(1/np.sum(mask,axis=(1,2)))
     bottomtemps = thetas    # print(bottomtemps.shape)
     surfacetemps = thetas
-    return {"ts":np.asarray(ts),"theta":np.asarray(thetas),"salt":np.asarray(salts),"kes":np.asarray(kes),"shiflx":np.asarray(shiwflxs),"bottemp":np.asarray(bottomtemps),"surfacetemp":np.asarray(surfacetemps)}
+    return {"ts":np.asarray(ts),"theta":np.asarray(thetas),"salt":np.asarray(salts),"kes":np.asarray(kes),"avgbts":np.asarray(avgbts),\
+        "shiflx":np.asarray(shiwflxs),"bottemp":np.asarray(bottomtemps),"surfacetemp":np.asarray(surfacetemps), "incavity":np.asarray(incavity)}
 
 def matVarsFile(fname):
     one_up = os.path.dirname(fname)
@@ -68,87 +84,82 @@ def intTemp(depth,fname):
     results = []
     ls = []
     result = quad(f_interp,depth,min(depth+200,0), points = zz[::-1])[0]
+    result = result/min(200,abs(depth))
     return result
 
 def AndrewsMetric(zglib,fname):
-    variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft',))
-
+    variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft','tEast','zz'))
     zpyc = np.asarray(variables["Zcdw_pt_shelf"])[0][0]
     icedraft = np.asarray(variables["icedraft"])
     zgl = np.nanmin(icedraft)
     print(zglib,zpyc,zgl)
     return (zpyc-zglib)*(zpyc-zgl)
 
-def steadyStateAverage(fname,xval,fig,axises,color="blue"):
-    ((ax1,ax2,ax5,ax7),(ax3,ax4,ax6,ax8)) = axises 
+def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o"):
+    ((ax1,ax2),(ax3,ax4)) = axises 
     data = timeSeries(fname)
     glib = GLIBfromFile(matVarsFile(fname))
-    #xval = intTemp(glib,fname)
-    xval = AndrewsMetric(glib,fname)
+    xval = intTemp(glib,fname)
+    #xval = AndrewsMetric(glib,fname)
     for k in data.keys():
         if k != "ts":
-            data[k] = np.nanmean(data[k][data["ts"]>2.5])
+            data[k] = np.nanmean(data[k][data["ts"]>5])
     variables = grabMatVars(fname,("Hshelf","randtopog_height","Zcdw_pt_South"))
     tcline_height = variables["Zcdw_pt_South"]
     shelf_depth = variables["Hshelf"]
     randtopog_height = variables["randtopog_height"]
     tcline_height = variables["Zcdw_pt_South"]
-    ax1.scatter(xval,data["theta"],c=color)
+    ax1.scatter(xval,data["theta"],c=color,marker=marker)
     ax1.set_xlabel("Height above HUB")
     ax1.set_ylabel("Potential Temperature")
     ## salt plot
-    ax2.scatter(xval,data["salt"],c=color)
+    ax2.scatter(xval,data["salt"],c=color,marker=marker)
     ax2.set_xlabel("Height above HUB")
     ax2.set_ylabel("Salinity")
 
     ## kinetic energy plot
-    ax3.scatter(xval,data["kes"],c=color)
+    ax3.scatter(xval,data["avgbts"],c=color,marker=marker)
     ax3.set_xlabel("Height above HUB")
     ax3.set_ylabel("Kinetic Energy")
 
-    ax4.scatter(xval,-data["shiflx"],c=color)
+    ax4.scatter(xval,-data["shiflx"],c=color,marker=marker)
     ax4.set_xlabel("Height above HUB")
     ax4.set_ylabel("Melt Rate m/yr")
     
     ## kinetic energy plot
     #totalSHIfwFlx = (ds.SHIfwFlx*ds.XC*ds.YC*ds.Z*ds.hFacC).sum(axis=[1,2,3]).values
-    bottomtemps = []
-    surfacetemps = []
+    # bottomtemps = []
+    # surfacetemps = []
 
-    ax5.scatter(xval,data["bottemp"],c=color)
-    #ax6.scatter(xval,data["surfacetemp"],c=color)
-    ax5.set_xlabel("Height above HUB")
-    ax5.set_ylabel("Bottom Potential Temperature")
+    # ax5.scatter(xval,data["bottemp"],c=color,marker=marker)
+    # #ax6.scatter(xval,data["surfacetemp"],c=color)
+    # ax5.set_xlabel("Height above HUB")
+    # ax5.set_ylabel("Bottom Potential Temperature")
     #ax6.set_xlabel("Height above HUB")
     #ax6.set_ylabel("Surface Potential Temperature")
-    ax7.scatter(shelf_depth,randtopog_height,c=color)
-    ax7.set_xlabel("Depth of shelf before random perturbation")
-    ax7.set_ylabel("Random perturbation amplitude")
-    ax8.scatter(tcline_height,-data["shiflx"],c=color)
-    ax8.set_xlabel("Depth of thermocline")
-    ax8.set_ylabel("Melt Rate m/yr")
 
 
 def timeSeriesDashboard(fname,label,fig,axises,times=np.array([])):
     ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
     data = timeSeries(fname)
-    ax1.plot(data["ts"][data["ts"]>2.5],data["theta"][data["ts"]>2.5],label=label)
+    starttime = 2.5
+    ax1.plot(data["ts"][data["ts"]>starttime],data["theta"][data["ts"]>starttime],label=label)
     ax1.set_xlabel("Time")
     ax1.set_ylabel("Potential Temperature")
     ax1.legend()
     ## salt plot
     color = [l for l in ax1.lines if l._label == label][0]._color
-    ax2.plot(data["ts"][data["ts"]>2.5],data["salt"][data["ts"]>2.5],label=label,c=color)
+    ax2.plot(data["ts"][data["ts"]>starttime],data["salt"][data["ts"]>starttime],label=label,c=color)
     ax2.set_xlabel("Time")
     ax2.set_ylabel("Salinity")
 
     ## kinetic energy plot
     kes = []
-    ax3.plot(data["ts"][data["ts"]>2.5],data["kes"][data["ts"]>2.5],label=label,c=color)
+    ax3.plot(data["ts"][data["ts"]>starttime],data["kes"][data["ts"]>starttime],label=label,c=color)
     ax3.set_xlabel("Time")
     ax3.set_ylabel("Kinetic Energy")
 
-    ax4.plot(data["ts"][data["ts"]>2.5],data["shiflx"][data["ts"]>2.5])
+    ax4.plot(data["ts"][data["ts"]>starttime],data["shiflx"][data["ts"]>starttime])
     ax4.set_xlabel("Time")
     ax4.set_ylabel("Melt Rate m/yr")
     
@@ -157,8 +168,8 @@ def timeSeriesDashboard(fname,label,fig,axises,times=np.array([])):
     bottomtemps = []
     surfacetemps = []
 
-    ax5.plot(data["ts"][data["ts"]>2.5],data["bottemp"][data["ts"]>2.5],label=label + " bottom",c=color)
-    ax6.plot(data["ts"][data["ts"]>2.5],data["surfacetemp"][data["ts"]>2.5],label=label + " surface",c=color)
+    ax5.plot(data["ts"][data["ts"]>starttime],data["bottemp"][data["ts"]>starttime],label=label + " bottom",c=color)
+    ax6.plot(data["ts"][data["ts"]>starttime],data["surfacetemp"][data["ts"]>starttime],label=label + " surface",c=color)
     ax5.set_xlabel("Time")
     ax5.set_ylabel("Bottom Potential Temperature")
     ax6.set_xlabel("Time")
@@ -191,9 +202,19 @@ def grabDeltaT(fname):
                 result = re.search('=(.*),', s)
                 return float(result.group(1))
 
+def grabFandB(fname):
+    p = Path(fname).parents[0]
+    p = str(p)+"/input/data"
+    with open(p,"rb") as file:
+        for line in file:
+            s = str(line)
+            if "f0" in s:
+                f = re.search('=(.*),', s)
+            if "B" in s:
+                B = re.search('=(.*),', s)
+    return float(f.group(1)),float(B.group(1))
 
-
-def barotropic_streamfunction(fname,description,times=np.array([]),res=5):
+def barotropic_streamfunction_graph(fname,description,times=np.array([]),res=1):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
@@ -228,6 +249,38 @@ def barotropic_streamfunction(fname,description,times=np.array([]),res=5):
             moviewriter.grab_frame()
             cb.remove()
             frame.remove()
+
+
+
+def barotropic_streamfunction_max(fname,times=np.array([]),res=1):
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    shortname, fpath = outPath(fname) 
+    fig,ax1 = plt.subplots()
+    depth = depthFromdZ(ds)
+    UFULL = ds.UVEL.values
+    VFULL = ds.VVEL.values
+    bts = []
+    for k in tqdm(range(0,ds.UVEL.values.shape[0],res)):
+        U = UFULL[k,:,:,:]
+        V = VFULL[k,:,:,:]
+        fDZ = list(np.diff(ds.Z))
+        fDZ.append(fDZ[-1])
+        fDZ = np.asarray(fDZ)
+        DZ = np.repeat(fDZ,U.shape[1]*U.shape[2])
+        DZ = DZ.reshape(U.shape[0],U.shape[1],U.shape[2])
+        UU = np.sum(U*DZ*ds.hFacW.values,axis=0)
+        xs = ds.XC.values
+        ys = list(np.diff(ds.YC.values))
+        ys.append(ys[-1])
+        ys = np.repeat(ys,U.shape[2])
+        ys = ys.reshape(U.shape[1],U.shape[2],order="F")
+        bt = np.cumsum(UU*ys,axis=0)
+        bt[np.sum(ds.hFacC,axis=0)==0] = np.nan
+        bts.append(np.nanmax(bt))
+    return bts
+
 
 def meltmap(fname,description,times=np.array([])):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
@@ -270,9 +323,9 @@ def crossSectionAnim(fname,description,times=np.array([]),quant="THETA",res=1):
     #ds[quant].values=ds[quant].values*ds.hFacC.values
 
     #print(ds.hFacC)
-    zonal_average = ds.where(ds.hFacC ==1).mean(dim="XC",skipna=True)
+    #zonal_average = ds.where(ds.hFacC==1).mean(dim="XC",skipna=True)
     #zonal_average = ds.mean(dim="XC",skipna=True)
-    #zonal_average = ds.isel(XC=50)
+    zonal_average = ds.where(ds.hFacC==1).isel(XC=100)
     moviewriter = FFMpegFileWriter(fps=1)
     tmin, tmax = np.nanmin(zonal_average[quant]), np.nanmax(zonal_average[quant])
     shortname, fpath = outPath(fname) 
@@ -350,8 +403,19 @@ def surfaceAnim(fname,description,times=np.array([]),quant="SALT"):
             moviewriter.grab_frame()
             cb.remove()
             frame.remove()
-
-
+def meltMaps(fname,xval,fig,axis,color="blue"):
+    times=getIterNums(fname)
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    ts = ds.time.values*grabDeltaT(fname)/60.0/60.0/24.0/365.0
+    tsnew = np.full_like(ts,0,dtype=float)
+    tsnew[:] = ts
+    ts = tsnew
+    ts = ts/1000000000
+    times=ts
+    shflx = np.nanmean(ds.SHIfwFlx.values[times>2.5],axis=0)
+    axis.set_title(xval)
+    axis.imshow(np.abs(shflx),cmap="jet",vmin=0,vmax=0.001)
 
 def getIterNums(fpath):
     iters = []
@@ -365,57 +429,147 @@ def getIterNums(fpath):
             saltiters.append(n)
     return np.unique(np.asarray(np.intersect1d(iters,saltiters)))[:-1]
 
+
+def garrettsLittleProject(fname,description,times=np.array([])):
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    shortname, fpath = outPath(fname) 
+    moviewriter = FFMpegFileWriter(fps=1)
+    fig,ax1 = plt.subplots()
+    mask = np.logical_and(ds.hFacC.values[0]==0,np.sum(ds.hFacC.values,axis=0)!=0)
+    f0,beta = grabFandB(fname)
+    
+    f = ds.YC.values*beta+f0
+    plt.plot(f)
+    plt.show()
+    with moviewriter.saving(fig, fpath+"-glp.mp4" , dpi=250):
+        for k in tqdm(range(ds.UVEL.values.shape[0])):
+            melt= ds.SHIfwFlx.values[k]
+
 # fig,axises = plt.subplots(2,3)
 # timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/saltflux-explore/up/results","up",fig,axises)
-#fig,axises = plt.subplots(2,3)
-#for k in [-200, -125, -50, 0, 50, 125, 200]:
+# fig,axises = plt.subplots(2,3)
+# for k in [-200, -125, -50, 0, 50, 125, 200]:
+#     try:
+#         timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at"+str(k)+"/results",str(k),fig,axises)
+#     except:
+#         print("nope",k)
+# plt.show()
+
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
+# bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
+# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
+
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at125/results","Restricted y domain length with default settings","THETA")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at125/results","Restricted y domain length with default settings","THETA")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/smallerslope-GLIB-explore-18/at125/results","Restricted y domain length with default settings","THETA")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/smallerslope-GLIB-explore-18/at-125/results","Restricted y domain length with default settings","THETA")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at125/results","Restricted y domain length with default settings","THETA")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at125/results","Restricted y domain length with default settings",quant="THETA")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/smallerslope-GLIB-explore-18/at125/results","Restricted y domain length with default settings",quant="THETA")
+
+#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at-125/results","Restricted y domain length with default settings")
+#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/smallerslope-GLIB-explore-18/at-125/results","Restricted y domain length with default settings")
+
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at125/results","Restricted y domain length with default settings",quant="THETA")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at125/results","Restricted y domain length with default settings",quant="THETA")
+
+#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at-125/results","Restricted y domain length with default settings")
+#barotropic_streamfunction("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at-125/results","Restricted y domain length with default settings")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
+
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at125/results","Restricted y domain length with default settings","THETA")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at125/results","Restricted y domain length with default settings","THETA")
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
+#fig,axises = plt.subplots(4,3)
+#for count, k in enumerate([ -125,  0,  125 ]):
+    #meltMaps("/home/garrett/Projects/MITgcm_ISC/experiments/smallerslope-GLIB-explore-18/at"+str(k)+"/results","smaller"+str(k),fig,axises[0][count],color="pink")
+##for count, k in enumerate([ -125,  0,  125 ]):
     #try:
-        #timeSeriesDashboard("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-18/at"+str(k)+"/results",str(k),fig,axises)
+        #meltMaps("/home/garrett/Projects/MITgcm_ISC/experiments/smallerslope-GLIB-explore-18/at"+str(k)+"/results","smaller"+str(k),fig,axises[0][count],color="black")
+    #except:
+        #print("nope",k)
+#for count, k in enumerate([ -125,  0,  125 ]):
+    #try:
+        #meltMaps("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at"+str(k)+"/results","bigger"+str(k),fig,axises[1][count],color="black")
+    #except:
+        #print("nope",k)
+##
+#for count, k in enumerate([ -125,  0,  125 ]):
+    #try:
+        #meltMaps("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at"+str(k)+"/results","halfw"+str(k),fig,axises[2][count],color="black")
+    #except:
+        #print("nope",k)
+###
+#for count, k in enumerate([ -125,  0,  125 ]):
+    #try:
+        #meltMaps("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at"+str(k)+"/results","doublew"+str(k),fig,axises[3][count],color="black")
     #except:
         #print("nope",k)
 #plt.show()
 
-# bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at-200/results","Restricted y domain length with default settings","SALT")
-# bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
-# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at-200/results","Restricted y domain length with default settings","SALT")
-# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
+fig,axises = plt.subplots(2,2)
+#for k in [-200, -125, -50, 0, 50, 125, 200]:
+    #steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at"+str(k)+"/results",k,fig,axises,color="red")
 
-fig,axises = plt.subplots(2,4)
-for k in [-200, -125, -50, 0, 50, 125, 200]:
-    steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-16/at"+str(k)+"/results",k,fig,axises,color="red")
+for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-18/*/", recursive = True):
+    try:
+        steadyStateAverage(f,0,fig,axises,color="red")
+    except:
+        print("nope",f)
 
-for k in [-200, -125, -50, 0, 50, 125, 200]:
-    try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="green")
-    except:
-        print("nope",k)
-for k in [-200, -125, -50, 0, 50, 125, 200]:
-    try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="blue")
-    except:
-        print("nope",k)
-for k in [-200, -125, -50, 0, 50, 125, 200]:
-    try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="orange")
-    except:
-        print("nope",k)
+if True:
+    for k in [-200, -125, -50, 0, 50, 125, 200]:
+        #try:
+        #steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="blue")
+        garrettsLittleProject("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-18/at"+str(k)+"/results",k)
+        #except:
+            #print("nope",k)
 
-for k in [-200, -125, -50, 0, 50, 125, 200]:
-    try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="gray")
-    except:
-        print("nope",k)
-for k in [-200, -125, -50, 0, 50, 125, 200]:
-    try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/smallerslope-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="pink")
-    except:
-        print("nope",k)
+    for k in [-200, -125, -50, 0, 50, 125, 200]:
+        try:
+            steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/tclinedz250-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="green")
+        except:
+            print("nope",k)
 
-for k in [-200, -125, -50, 0, 50, 125, 200]:
-    try:
-        steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="black")
-    except:
-        print("nope",k)
+    for k in [-200, -125, -50, 0, 50, 125, 200]:
+        try:
+            steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/halfw-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="gray")
+        except:
+            print("nope",k)
+
+    for k in [-200, -125, -50, 0, 50, 125, 200]:
+        try:
+            steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="orange")
+        except:
+            print("nope",k)
+
+    for k in [-200, -125, -50, 0, 50, 125, 200]:
+        try:
+            steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/smallerslope-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="black")
+        except:
+            print("nope",k)
+
+    for k in [-200, -125, -50, 0, 50, 125, 200]:
+        try:
+            steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/biggerslope-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="purple")
+        except:
+            print("nope",k)
+
+    for k in [-200, -125, -50, 0, 50, 125, 200]:
+        try:
+            steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/slope200-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="pink")
+        except:
+            print("nope",k)
+
+    for k in [-200, -125, -50, 0, 50, 125, 200]:
+        try:
+            steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at"+str(k)+"/results",k,fig,axises,color="cyan")
+        except:
+            print("nope",k)
+
 
 # for k in [-200, -100, -50, -25, 0, 150]:
 #     try:
