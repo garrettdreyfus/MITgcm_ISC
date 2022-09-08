@@ -398,13 +398,19 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   iceidx = find(Y<=Yicefront);  
   icedraft(iceidx) = -Hicefront - (Y(iceidx)-Yicefront)/Yicefront * Hice;
   icedraft(icedraft<h) = h(icedraft<h);
+
+  cont_icedraft = -Hicefront - (Y-Yicefront)/Yicefront * Hice;
+  cont_icedraft(cont_icedraft>0)=0
+  cont_icedraft(cont_icedraft<h) = h(cont_icedraft<h);
+  surface(X,Y,cont_icedraft)
+  
   if(useRandTopo) 
     rng(experiment_parameters.rng_seed);
     randtopog_height = experiment_parameters.random_amplitude;
     randtopog_length = 62.5*m1km;
     h_rand = genRandField(randtopog_length,[],randtopog_height,Nx,Ny,Lx,Ly);
     h_rand = h_rand - min(min(h_rand));
-    h_rand = h_rand .* ((icedraft-h)/(H)); %%% Scale by topographic height so that bumps are most pronounced in deep areas
+    h_rand = h_rand .* ((cont_icedraft-h)/(H)); %%% Scale by topographic height so that bumps are most pronounced in deep areas
     %h_rand(icedraft-h<h_rand)=icedraft(icedraft-h<h_rand)-h(icedraft-h<h_rand)
     h = h + h_rand;
   end

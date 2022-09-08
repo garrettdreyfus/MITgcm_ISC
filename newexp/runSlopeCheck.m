@@ -15,12 +15,44 @@ function runSlopeCheck()
   depths = [-125 0 125] ;
   experiment_parameters.cavity_depth = -450;
 
+  % bath = -480
+  % experimen_parameters.bath = bath;
+  % currentFolder = pwd;
+  % for k = depths
+  %   experiment_parameters.tcline_atshelf_depth = bath+k;
+  %   path_part1 = convertStringsToChars(strcat("experiments/biggerslope-GLIB-explore-",int2str(rng_seed),"/"));
+  %   path_part2 = convertStringsToChars(strcat("at",int2str(k)));
+  %   full_path = convertStringsToChars(strcat("../",path_part1,path_part2));
+  %   newexp(path_part1,path_part2,experiment_parameters);
+  %   cd(full_path);
+  %   system('sh upload_to_cluster.sh')
+  %   cd(currentFolder);
+  % end
+  % currentFolder = pwd;
+  % depths = [-125 0 125] ;
+  %
+  % experiment_parameters.cavity_depth = -100;
+  %
+  % bath = -440
+  % experimen_parameters.bath = bath;
+  % for k = depths
+  %   experiment_parameters.tcline_atshelf_depth = bath+k;
+  %   path_part1 = convertStringsToChars(strcat("experiments/smallerslope-GLIB-explore-",int2str(rng_seed),"/"));
+  %   path_part2 = convertStringsToChars(strcat("at",int2str(k)));
+  %   full_path = convertStringsToChars(strcat("../",path_part1,path_part2));
+  %   newexp(path_part1,path_part2,experiment_parameters);
+  %   cd(full_path);
+  %   system('sh upload_to_cluster.sh')
+  %   cd(currentFolder);
+  % end
+
+  experiment_parameters.cavity_depth = -375;
   bath = -480
   experimen_parameters.bath = bath;
   currentFolder = pwd;
   for k = depths
     experiment_parameters.tcline_atshelf_depth = bath+k;
-    path_part1 = convertStringsToChars(strcat("experiments/biggerslope-GLIB-explore-",int2str(rng_seed),"/"));
+    path_part1 = convertStringsToChars(strcat("experiments/slope375-GLIB-explore-",int2str(rng_seed),"/"));
     path_part2 = convertStringsToChars(strcat("at",int2str(k)));
     full_path = convertStringsToChars(strcat("../",path_part1,path_part2));
     newexp(path_part1,path_part2,experiment_parameters);
@@ -30,14 +62,14 @@ function runSlopeCheck()
   end
   currentFolder = pwd;
   depths = [-125 0 125] ;
-
-  experiment_parameters.cavity_depth = -100;
-
-  bath = -440
+  
+  experiment_parameters.cavity_depth = -200;
+  
+  bath = -460
   experimen_parameters.bath = bath;
   for k = depths
     experiment_parameters.tcline_atshelf_depth = bath+k;
-    path_part1 = convertStringsToChars(strcat("experiments/smallerslope-GLIB-explore-",int2str(rng_seed),"/"));
+    path_part1 = convertStringsToChars(strcat("experiments/slope200-GLIB-explore-",int2str(rng_seed),"/"));
     path_part2 = convertStringsToChars(strcat("at",int2str(k)));
     full_path = convertStringsToChars(strcat("../",path_part1,path_part2));
     newexp(path_part1,path_part2,experiment_parameters);
