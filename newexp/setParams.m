@@ -400,9 +400,9 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   icedraft(icedraft<h) = h(icedraft<h);
 
   cont_icedraft = -Hicefront - (Y-Yicefront)/Yicefront * Hice;
-  cont_icedraft(cont_icedraft>0)=0
+  cont_icedraft(cont_icedraft>0)=0;
   cont_icedraft(cont_icedraft<h) = h(cont_icedraft<h);
-  surface(X,Y,cont_icedraft)
+  surface(X,Y,cont_icedraft);
   
   if(useRandTopo) 
     rng(experiment_parameters.rng_seed);
@@ -433,7 +433,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   clf;    
 
   %%% Bathymetry  
-  p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,h(:,2:end-1));
+  p = surf(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,h(:,2:end-1));
   p.FaceColor = [11*16+9 9*16+12 6*16+11]/255;
   p.EdgeColor = 'none';
 
@@ -593,6 +593,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
 
   %%% Plot the relaxation temperature
   if (showplots)
+
+    figure(fignum);
+    fignum = fignum + 1;
+    surf(X,Y,h)
     figure(fignum);
     fignum = fignum + 1;
     clf;
@@ -1094,6 +1098,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%% WRITE THE 'data.seaice' FILE %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    disp("huh")
     write_data_seaice(inputpath,SEAICE_PARM,listterm,realfmt);  
     
   end
@@ -1251,39 +1256,51 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
 
     %%% Define parameters for layers package %%%
 
-    %%% Number of fields for which to calculate layer fluxes  
-    layers_maxNum = 2;
+  layers_maxNum = 2;
+%   layers_maxNum = 1;
 
-    %%% Specify potential density
-    layers_name = char('RHO','TH'); 
+%   %%% Specify potential density
+  layers_name = char('RHO','TH'); 
+%     layers_name = char('RHO'); 
 
-    layers_bounds(:,1) = [0 35 ...
-           35.8:0.05:36.3 ...
-           36.4 36.54:0.02:36.66 ...
-           36.7 36.73 36.76 36.8:0.1:37.1 ...
-           37.13:0.02:37.17 37.18:0.004:37.206 ...
-           37.21:0.003:37.3 37.5 40]; 
-    layers_bounds(:,2) = [-10 -1.88:0.01:-1.78 -1.76:0.05:-1.2 -1.18:0.02:-1.16 -1.144:0.002:-1.18 -1.15:0.05:1 10];
+% % % %%% Hires, sdiff3, sdiff2.5, sdiff2
+% % %      layers_bounds(:,1) = [0 30 36.4 36.54:0.02:36.66 ...
+% % %          36.7 36.73 36.76 36.8:0.1:37.1 ...
+% % %          37.13:0.02:37.17 37.19:0.004:37.206 ...
+% % %          37.21:0.003:37.29 ...
+% % %          37.295:0.015:37.4 ...
+% % %          37.41 37.42 37.422:0.003:37.425 37.426 37.428 37.429 37.43 37.45 37.5 40]; 
+% % %      layers_bounds(:,2) = [-10 -1.88:0.005:-1.83 -1.8:0.05:-1.2 -1.18:0.02:-1.16 -1.144:0.002:-1.18 -1.15:0.05:0.95 10];
+     
+     
+% % % % % %%%%% Hires, ssurf33, surf33.56, surf34.12_0dS, surf34.12_1dS
+     layers_bounds(:,1) = [0 35 ...
+         35.8:0.05:36.3 ...
+         36.4 36.54:0.02:36.66 ...
+         36.7 36.73 36.76 36.8:0.1:37.1 ...
+         37.13:0.02:37.17 37.18:0.004:37.206 ...
+         37.21:0.003:37.3 37.5 40]; 
+     layers_bounds(:,2) = [-10 -1.88:0.01:-1.78 -1.76:0.05:-1.2 -1.18:0.02:-1.16 -1.144:0.002:-1.18 -1.15:0.05:1 10];
 
-
-    %%% Reference level for calculation of potential density  
-    layers_krho = [51 1]; % High-resolution zz (51)=-1.9943e+03 m;
-
-    %%% If set true, the GM bolus velocity is added to the calculation
-    layers_bolus = false;  
-
+  %%% Reference level for calculation of potential density
+  refDepth = 2*m1km;
+  [dz_refDepth idx_refDepth] = min(abs(abs(zz)-refDepth));
+  layers_krho = [idx_refDepth 1];    %%% Pressure reference level, level indice k
+  %   layers_krho = 51 % High-resolution zz (51)=-1.9943e+03 m;
+  
+  %%% If set true, the GM bolus velocity is added to the calculation
+  layers_bolus = false;  
+   
+  %%% Layers
     for nl=1:layers_maxNum    
+%       layers_parm01.addParm(['layers_bounds'],layers_bounds,PARM_REALS); 
+%       layers_parm01.addParm(['layers_krho'],layers_krho,PARM_INT); 
+%       layers_parm01.addParm(['layers_name'],strtrim(layers_name),PARM_STR); 
       layers_parm01.addParm(['layers_name(' num2str(nl) ')'],strtrim(layers_name(nl,:)),PARM_STR); 
       layers_parm01.addParm(['layers_krho(' num2str(nl) ')'],layers_krho(nl),PARM_INT); 
       layers_parm01.addParm(['layers_bounds(:,' num2str(nl) ')'],layers_bounds(:,nl),PARM_REALS); 
     end
-    %%% Layers
-    %% layers_parm01.addParm(['layers_bounds'],layers_bounds,PARM_REALS); 
-    %% layers_parm01.addParm(['layers_krho'],layers_krho,PARM_INT); 
-    %% layers_parm01.addParm(['layers_name'],strtrim(layers_name),PARM_STR);
-    
     layers_parm01.addParm('layers_bolus',layers_bolus,PARM_BOOL); 
-
     %%z% Create the data.layers file
     write_data_layers(inputpath,LAYERS_PARM,listterm,realfmt);
 
@@ -1413,7 +1430,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
 
   %%% Annual mean diagnostics
   diag_fields_avg = {'SHIfwFlx','SALT','THETA','momKE','RHOAnoma','LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO',...
-		     'UVEL','VVEL','WVEL','PHIHYD','ETAN'};%%% Basic state 
+		     'UVEL','VVEL','WVEL','PHIHYD','ETAN','KPPdiffS','KPPdiffT','KPPghatK','KPPhbl','MXLDEPTH'};%%% Basic state 
   % % %      'TOTTTEND','TFLUX','ADVy_TH','VVELTH','oceQnet',...%%% Heat budget
   % % %      'UVELSQ','VVELSQ','WVELSQ','UV_VEL_Z','WU_VEL','WV_VEL',...%%% Energy budget
   % % %      'LaVH1RHO','LaHs1RHO',...%%% Overturning circ

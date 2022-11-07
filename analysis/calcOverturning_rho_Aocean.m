@@ -133,7 +133,7 @@ function calcOverturning_rho_Aocean (expdir,expname,prodir)
    
   %%% Calculate the potential density pt
   g=9.81;
-  rhoConst = 999.8;
+  rhoConst = 1027;
   refdepth = -zz(layers_krho(1));
   refpress = rhoConst*(g*refdepth + pressure_tavg(:,:,layers_krho(1)))/1e4; %%% unit: dbar
   
