@@ -1,4 +1,4 @@
-function runWidthCheck()
+function shelfZexpCheckHighRes()
   %% Depth at this seed is 465
   experiment_parameters = struct;
   experiment_parameters.tcline_deltaz = 100;
@@ -12,17 +12,19 @@ function runWidthCheck()
   experiment_parameters.rbcs_temp = false;
   experiment_parameters.cavity_depth = -300;
   experiment_parameters.cavity_width = 150;
+  experiment_parameters.yicefront = 150;
   currentFolder = pwd;
-  shelf_depths = [ 800,400,200];
-  baths= [-555 -280 -155];
-  tcline_heights = [-300,0,125]
-  for i = 1:3
+  shelf_depths = [700,500];
+  baths= [-485 -350];
+  tcline_heights = [100]
+  for i = 1:1
     d = shelf_depths(i);
     bath = baths(i);
+    disp(bath)
     for k = tcline_heights
         experiment_parameters.shelf_depth = d;
         experiment_parameters.tcline_atshelf_depth = bath+k;
-        path_part1 = convertStringsToChars(strcat("experiments/shelfzexp-GLIB-explore-",int2str(rng_seed),"/"));
+        path_part1 = convertStringsToChars(strcat("experiments/shelfzexp-highres-GLIB-explore-",int2str(rng_seed),"/"));
         path_part2 = convertStringsToChars(strcat("at",int2str(k),"d",int2str(d)));
         full_path = convertStringsToChars(strcat("../",path_part1,path_part2));
         newexp(path_part1,path_part2,experiment_parameters);

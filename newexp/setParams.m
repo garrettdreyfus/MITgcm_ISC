@@ -110,7 +110,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   Ydeep = 350*m1km; %%% Latitude of deep ocean
   Xeast = (Lx/2)+(experiment_parameters.cavity_width*m1km/2); %%% Longitude of eastern trough wall
   Xwest = (Lx/2)-(experiment_parameters.cavity_width*m1km/2); %%% Longitude of western trough wall
-  Yicefront = 150*m1km; %%% Latitude of ice shelf face
+  Yicefront = experiment_parameters.yicefront*m1km; %%% Latitude of ice shelf face
   Hicefront = 200; %%% Depth of ice shelf frace
   Hbed = experiment_parameters.cavity_depth; %%% Change in bed elevation from shelf break to southern domain edge
   Hice = Hicefront-(Hshelf-Hbed); %%% Change in ice thickness from ice fromt to southern domain edge
@@ -592,7 +592,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   uEast = uEast_TWV;
 
   %%% Plot the relaxation temperature
-  if (showplots)
+  if (showplots || true)
 
     figure(fignum);
     fignum = fignum + 1;
@@ -652,6 +652,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   for k=1:Nr-1
     N2_north(k) = -(g/rhoConst)*(densmdjwf(sNorth(k),tNorth(k),pp_mid_north(k)) - densmdjwf(sNorth(k+1),tNorth(k+1),pp_mid_north(k))) / (zz(k)-zz(k+1));
   end      
+  disp(N2_north);
   
   %%% Calculate internal wave speed and first Rossby radius of deformation
   dzData = zz(1:end-1)-zz(2:end);

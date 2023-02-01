@@ -1,0 +1,33 @@
+Warning: Imaginary parts of complex X and/or Y arguments ignored 
+> In setParams (line 693)
+  In newexp (line 292)
+  In runShelfDepthCheck (line  asdfasdfasdf 29) 
+
+resultspath =
+
+    '~/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at0d200/results'
+
+~/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at0d200/results/run_mitgcm
+  -2.5090e+03
+
+Warning: Negative data ignored 
+> In matlab.graphics.shape.internal.AxesLayoutManager>calculateLooseInset
+  In matlab.graphics.shape.internal/AxesLayoutManager/updateStartingLayoutPosition
+  In matlab.graphics.shape.internal/AxesLayoutManager/doUpdate
+  In xlabel (line 56)
+  In setParams (line 680)
+  In newexp (line 292)
+  In runShelfDepthCheck (line 29) 
+Warning: Imaginary parts of complex X and/or Y arguments ignored 
+> In setParams (line 693)
+  In newexp (line 292)
+  In runShelfDepthCheck (line 29) 
+
+resultspath =
+
+    '~/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at125d200/results'
+
+~/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at125d200/results/run_mitgcm
+>> exit
+➜  newexp git:(main) ✗ exit
+
