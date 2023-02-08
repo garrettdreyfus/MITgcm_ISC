@@ -136,10 +136,24 @@ def GLIBfromFile(fname,full=False):
     icedraft[h==0] = 0
     GLIB = generateBedmapGLIBs(h,icedraft)
     GLIB[np.asarray(GLIB-h)<10] = np.nan
+    #plt.imshow(GLIB)
+    #plt.show()
     if full:
         return GLIB
     else:
         return np.nanmean(GLIB[icedraft==np.nanmin(icedraft)])
+
+def aisfdepth(fname,full=False):
+    variables = scipy.io.loadmat(fname,variable_names=('h','icedraft'))
+    icedraft = np.asarray(variables["icedraft"])
+    h = np.asarray(variables["h"])
+    icedraftbd = bd(icedraft!=0)
+    #fig, (ax1,ax2) = plt.subplots(1,2)
+    #ax1.imshow(icedraft)
+    #ax2.imshow(np.logical_and(icedraftbd,np.logical_and(icedraft==0,h!=0)))
+    #ax2.imshow(h)
+    #plt.show()
+    return np.nanmean(h[np.logical_and(icedraftbd,np.logical_and(icedraft==0,h!=0))])
 
 def MSDfromFile(fname):
     print(fname)
@@ -180,12 +194,12 @@ def RdfromFile(fname):
 #plt.ylabel("Depth")
 #plt.show()
 
-print(200,GLIBfromFile('../experiments/slope200-GLIB-explore-18/at-125/input/metaparameters.mat'))
-print(375,GLIBfromFile('../experiments/slope375-GLIB-explore-18/at-125/input/metaparameters.mat'))
+#print(200,GLIBfromFile('../experiments/slope200-GLIB-explore-18/at-125/input/metaparameters.mat'))
+#print(375,GLIBfromFile('../experiments/slope375-GLIB-explore-18/at-125/input/metaparameters.mat'))
 
-print("w50",GLIBfromFile('../experiments/widthexp-GLIB-explore-18/w50/input/metaparameters.mat'))
-print("w100",GLIBfromFile('../experiments/widthexp-GLIB-explore-18/w100/input/metaparameters.mat'))
-print("w250",GLIBfromFile('../experiments/widthexp-GLIB-explore-18/w250/input/metaparameters.mat'))
+#print("21",GLIBfromFile('../experiments/GLIB-explore-21/at-400/input/metaparameters.mat'))
+#print("w100",GLIBfromFile('../experiments/widthexp-GLIB-explore-18/w100/input/metaparameters.mat'))
+#print("w250",GLIBfromFile('../experiments/widthexp-GLIB-explore-18/w250/input/metaparameters.mat'))
 #variables = scipy.io.loadmat('../experiments/GLIB-explore/under/input/metaparameters.mat',variable_names=('h','icedraft'))
 # variables = scipy.io.loadmat('../experiments/smallerslope-GLIB-explore-18/at-125/input/metaparameters.mat',variable_names=('h','icedraft'))
 # icedraft = np.asarray(variables["icedraft"])

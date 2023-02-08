@@ -50,12 +50,12 @@ for n=1:nDumps
   [YY,XX] = meshgrid(yy,xx);  
   vort = zeros(Nx,Ny);
   zlev = 53;
-  vort(:,2:Ny) = - (uvel(:,2:Ny,zlev)-uvel(:,1:Ny-1,zlev))/delY(1);
-  vort = vort + (vvel([2:Nx 1],:,zlev)-vvel(:,:,zlev))/delX(1);
-%   ubt = sum(uvel.*DZ.*hFacW,3) ./ sum(DZ.*hFacW,3);
-%   vbt = sum(vvel.*DZ.*hFacS,3) ./ sum(DZ.*hFacS,3);
-%   vort(:,2:Ny) = - (ubt(:,2:Ny)-ubt(:,1:Ny-1))/delY(1);
-%   vort = vort + (vbt([2:Nx 1],:)-vbt(:,:))/delX(1);  
+  %vort(:,2:Ny) = - (uvel(:,2:Ny,zlev)-uvel(:,1:Ny-1,zlev))/delY(1);
+  %vort = vort + (vvel([2:Nx 1],:,zlev)-vvel(:,:,zlev))/delX(1);
+ubt = sum(uvel.*DZ.*hFacW,3) ./ sum(DZ.*hFacW,3);
+vbt = sum(vvel.*DZ.*hFacS,3) ./ sum(DZ.*hFacS,3);
+vort(:,2:Ny) = - (ubt(:,2:Ny)-ubt(:,1:Ny-1))/delY(1);
+vort = vort + (vbt([2:Nx 1],:)-vbt(:,:))/delX(1);  
   ff = f0+beta*YY;
   pcolor(XX/1000,YY/1000,vort./abs(ff));
   shading interp;
@@ -76,3 +76,13 @@ for n=1:nDumps
   M(n) = getframe(gcf);  
   
 end
+
+%%% Write as .mp4 file
+vw = VideoWriter('~/Projects/MITgcm_ISC/pics/animVort.mp4','Motion JPEG AVI');
+vw.FrameRate=5;
+open(vw);
+for m = M
+  writeVideo(vw,m);
+end
+close(vw);
+

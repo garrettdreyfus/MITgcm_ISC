@@ -17,6 +17,7 @@ function calcOverturning_rho_Aocean (expdir,expname,prodir)
  
   %%% Density bins for MOC calculation  
   ptlevs = flip(layers_bounds(:,1));
+  disp(ptlevs);
   Npt = length(ptlevs)-1;
  
   %%% Frequency of diagnostic output - should match that specified in
@@ -133,16 +134,18 @@ function calcOverturning_rho_Aocean (expdir,expname,prodir)
    
   %%% Calculate the potential density pt
   g=9.81;
-  rhoConst = 999.8;
+  rhoConst = 1027;
   refdepth = -zz(layers_krho(1));
   refpress = rhoConst*(g*refdepth + pressure_tavg(:,:,layers_krho(1)))/1e4; %%% unit: dbar
   
    
   for kk = 1:Nr
-      pt_tavg(:,:,kk) = densmdjwf(salt_tavg(:,:,kk),theta_tavg(:,:,kk),refpress)-1000;
+      pt_tavg(:,:,kk) = densmdjwf(salt_tavg(:,:,kk),theta_tavg(:,:,kk),refpress)-1027;
   end
   
   pt_tavg(SALT==0) = NaN;
+  h= pcolor(pt_tavg(:,:,10))
+  waitfor(h)
  
   %%% Interpolate potential temperature to v-gridpoints  
   pt_v = NaN*pt_tavg;
@@ -207,6 +210,8 @@ function calcOverturning_rho_Aocean (expdir,expname,prodir)
     psim_pt(:,m) = sum(vflux_m_xint(:,m:Npt),2);     
   end
   psi_pt = psi_pt/1e6;
+  h = pcolor(psi_pt);
+  waitfor(h)
   psim_pt = psim_pt/1e6;
   psie_pt = psi_pt - psim_pt;
  
@@ -315,26 +320,26 @@ function calcOverturning_rho_Aocean (expdir,expname,prodir)
     [DD,LL] = meshgrid(ptlevs,yy);
 
     figure(32)
-    PSIlim=[-0.001 0.001];
+    PSIlim=[-1 1];
     subplot(2,3,1)
     pcolor(yy/1000,ptlevs,psi_pt');
-    shading interp;colormap('redblue');colorbar;caxis(PSIlim);
+    shading interp;colormap('redblue');colorbar;%caxis(PSIlim);
     ylim(YLIM);
     xlabel('y (km)');ylabel('Potential density (kg/m^3)');
     title('\psi (Sv) in PT space')
     subplot(2,3,2)
     pcolor(yy/1000,zzf,psi_z');
-    shading interp;colormap('redblue');colorbar;caxis(PSIlim);
+    shading interp;colormap('redblue');colorbar;%caxis(PSIlim);
     xlabel('y (km)');ylabel('z (m)');
     title('\psi (Sv), interpolating the streamfunction')
     subplot(2,3,3)
     pcolor(yy/1000,zzf,psim_z');
-    shading interp;colormap('redblue');colorbar;caxis(PSIlim);
+    shading interp;colormap('redblue');colorbar;%caxis(PSIlim);
     xlabel('y (km)');ylabel('z (m)');
     title('\psi_{mean} (Sv), interpolating the streamfunction')
     subplot(2,3,4)
     pcolor(LL/1000,Zisop,psi_pt);
-    shading interp;colormap('redblue');colorbar;caxis(PSIlim);
+    shading interp;colormap('redblue');colorbar;%caxis(PSIlim);
     hold on;
     contour(LL/1000,Zisop,DD,[37:0.05:37.25],'EdgeColor','w');
     hold off;
@@ -342,12 +347,12 @@ function calcOverturning_rho_Aocean (expdir,expname,prodir)
     title('\psi (Sv), interpolating Zisop (with isotherms)')
     subplot(2,3,5)
     pcolor(LL/1000,Zisop,psim_pt);
-    shading interp;colormap('redblue');colorbar;caxis(PSIlim);
+    shading interp;colormap('redblue');colorbar;%caxis(PSIlim);
     xlabel('y (km)');ylabel('z (m)');
     title('\psi_{mean} (Sv), interpolating Zisop')
     subplot(2,3,6)
     pcolor(LL/1000,Zisop,psie_pt);
-    shading interp;colormap('redblue');colorbar;caxis(PSIlim);
+    shading interp;colormap('redblue');colorbar;%caxis(PSIlim);
     xlabel('y (km)');ylabel('z (m)');
     title('\psi_{eddy} (Sv), interpolating Zisop')
 %     
