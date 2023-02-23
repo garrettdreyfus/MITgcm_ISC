@@ -13,13 +13,24 @@ import scipy
 from scipy.integrate import quad
 from matlabglib import GLIBfromFile,aisfdepth
 import gsw
+import pickle
 
 #matplotlib.use("TkAgg")
 
 def timeSeries(fname):
+
+    fnameparts = fname.split("/")
+    slug = fnameparts[-3]+"-"+fnameparts[-2]+".pickle"
+
+    if os.path.isfile("data/modelTimeSeries/"+slug):
+        with open("data/modelTimeSeries/"+slug,"rb") as f:
+            output = pickle.load(f)
+        return output
+
+
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
-    ds = open_mdsdataset(fname,prefix=["THETA","SALT","momKE","SHIfwFlx","VVEL"],ignore_unknown_vars=True,iters=times,extra_variables = extra_variables)
+    ds = open_mdsdataset(fname,prefix=["THETA","SALT","momKE","SHIfwFlx","VVEL","UVEL","WVEL"],ignore_unknown_vars=True,iters=times,extra_variables = extra_variables)
     totalvolume  = 1#(ds.XC.diff("x")*ds.YC.diff("y")*ds.Z.diff("z")*ds.hFacC).sum().values
     ## theta plot
     ts = ds.time.values*grabDeltaT(fname)/60.0/60.0/24.0/365.0
@@ -34,18 +45,22 @@ def timeSeries(fname):
     cavvolume = (cavity.hFacC * cavity.drF * cavity.rA).values
     volumesum = np.sum(volume)
     cavvolumesum = np.sum(cavvolume)
+
     thetas=[]
     THETA = cavity.THETA.values
     for k in range(cavity.THETA.shape[0]):
         thetas.append((np.sum(THETA[k]*cavvolume))/cavvolumesum)
+
     salts = []
     SALT = cavity.SALT.values
     for k in range(cavity.THETA.shape[0]):
         salts.append((np.sum(SALT[k]*cavvolume))/cavvolumesum)
+
     kes = []
     momKE = cavity.momKE.values
     for k in range(cavity.THETA.shape[0]):
         kes.append((np.sum(momKE[k]*cavvolume))/cavvolumesum)
+
     incavity = []
     vvel = ds.VVEL.values
     frontmask = ds.hFacC[:,np.nanargmin(np.abs(ds.VVEL.YG-yice)),:]==0
@@ -54,24 +69,57 @@ def timeSeries(fname):
         vvelcross = vvel[k,:,sliceindex,:]
         vvelcross[frontmask]=np.nan
         incavity.append(np.nansum(vvelcross[vvelcross<0]))
+
     mask = ~np.isnan(ds.SHIfwFlx.values)
     shflx = ds.SHIfwFlx.values
     shiwflxs = []
     vals = grabMatVars(fname,("h","icedraft"))
     icedraft = np.abs(np.asarray(vals["icedraft"]))
     h = np.abs(np.asarray(vals["h"]))
-    icemask = np.logical_and(icedraft>0,icedraft<h)
+
+    icemaskm = np.logical_and(icedraft>0,icedraft<h)
     for k in range(shflx.shape[0]):
-        shiwflxs.append(np.mean(shflx[k][icemask.T])*(60*60*24*365)*(1/920.0))
+        shiwflxs.append(np.mean(shflx[k][icemaskm.T])*(60*60*24*365)*(1/920.0))
+
+
     avgbts = barotropic_streamfunction_max(fname)
     print(fname)
     print(shiwflxs)
     nanmask = ~np.isnan(shiwflxs)
     #np.sum(shflx*mask,axis=(1,2))*(60*60*24*365)*(1/920.0)*(1/np.sum(mask,axis=(1,2)))
     bottomtemps = thetas    # print(bottomtemps.shape)
-    surfacetemps = thetas
-    return {"ts":np.asarray(ts)[nanmask],"theta":np.asarray(thetas)[nanmask],"salt":np.asarray(salts)[nanmask],"kes":np.asarray(kes)[nanmask],"avgbts":np.asarray(avgbts)[nanmask],\
-        "shiflx":np.asarray(shiwflxs)[nanmask],"bottemp":np.asarray(bottomtemps)[nanmask],"surfacetemp":np.asarray(surfacetemps)[nanmask], "incavity":np.asarray(incavity)[nanmask]}
+    icem = icemask(fname,ds)
+    print(THETA.shape,icem.shape)
+    print(icem.shape,icemaskm.shape)
+    THETA = ds.THETA.values
+    SALT = ds.SALT.values
+    UVEL = ds.UVEL.values
+    VVEL = ds.VVEL.values
+    WVEL = ds.WVEL.values
+    VEL = np.sqrt(UVEL**2 + VVEL**2 + WVEL**2)
+    #plt.imshow(icemaskm)
+    #plt.show()
+    icem[:,~icemaskm.T] = 0
+    icem[~icem]=np.nan
+    icesurfacetemps = []
+    icesurfacevels = []
+    icesurfacesalts = []
+    meltapprox=[]
+
+    for k in range(THETA.shape[0]):
+        icesurfacetemps.append(np.nansum((THETA[k]+1.8) * icem)/np.sum(~np.isnan(icem)))
+        icesurfacevels.append(np.nansum(VEL[k] * icem)/np.sum(~np.isnan(icem)))
+        icesurfacesalts.append(np.nansum(SALT[k] * icem)/np.sum(~np.isnan(icem)))
+        meltapprox.append(np.nansum((THETA[k]+1.8)*VEL[k] * icem)/np.sum(~np.isnan(icem)))
+
+    output = {"ts":np.asarray(ts)[nanmask],"theta":np.asarray(thetas)[nanmask],"salt":np.asarray(salts)[nanmask],\
+        "kes":np.asarray(kes)[nanmask],"avgbts":np.asarray(avgbts)[nanmask],\
+        "shiflx":np.asarray(shiwflxs)[nanmask],"bottemp":np.asarray(bottomtemps)[nanmask],"icesurfacetemp":np.asarray(icesurfacetemps)[nanmask],\
+        "icesurfacesalt":np.asarray(icesurfacesalts)[nanmask],\
+        "icesurfacevel":np.asarray(icesurfacevels)[nanmask],"meltapprox":np.asarray(meltapprox)[nanmask], "incavity":np.asarray(incavity)[nanmask]}
+    with open("data/modelTimeSeries/"+slug,"wb") as f:
+        pickle.dump(output,f)
+    return output
 
 def matVarsFile(fname):
     one_up = os.path.dirname(fname)
@@ -90,10 +138,37 @@ def intTemp(depth,fname):
     f_interp = lambda xx: np.interp(xx, zz[::-1], tEast[::-1])
     results = []
     ls = []
-    result = quad(f_interp,depth,min(depth+200,0), points = zz[::-1])[0]
-    print("square")
-    result = ((result/min(200,abs(depth)))**2)
+    result = quad(f_interp,depth,min(depth+25,0), points = zz[::-1])[0]
+    result = ((result/min(200,abs(depth))))
     return result
+
+def iceFaceTemp(depth,fname):
+    print(depth)
+    variables = grabMatVars(fname,('tNorth','tEast','zz','icedraft',''))
+    icedraft = np.asarray(variables["icedraft"])
+    print(np.mean(icedraft))
+    icedraft[icedraft<depth] = depth
+    tEast = np.asarray(variables["tEast"])#[0]+1.8
+    zz = np.asarray(variables["zz"])[0]
+    tEast = tEast[int(tEast.shape[0]-1)]+1.8
+    f_interp = lambda xx: np.interp(xx, zz[::-1], tEast[::-1])
+    results = []
+    ls = []
+    for l in icedraft[icedraft!=0]:
+        result = quad(f_interp,l,min(l+5,0), points = zz[::-1])[0]
+        result = ((result/min(5,abs(l))))
+        results.append(result)
+    return np.nanmean(results)
+
+def maxTemp(depth,fname):
+    print(depth)
+    variables = grabMatVars(fname,('tNorth','tEast','zz',''))
+    tEast = np.asarray(variables["tEast"])#[0]+1.8
+    zz = np.asarray(variables["zz"])[0]
+    tEast = tEast[int(tEast.shape[0]-1)]+1.8
+    return zz[np.argmax(tEast)]
+
+
 
 def AndrewsMetric(zglib,fname):
     variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft','tEast','zz'))
@@ -117,43 +192,31 @@ def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o"):
     variables = grabMatVars(fname,("Hshelf","randtopog_height","Zcdw_pt_South","icedraft"))
     icedraft = np.asarray(variables["icedraft"])
     zgl = np.nanmin(icedraft)
-    print(zgl,glib)
-    xval = intTemp(aisf,fname)
+
+    aisfxval = intTemp(aisf,fname)
+    glibxval = intTemp(glib,fname)
+    #glibxval = iceFaceTemp(glib,fname)
+
     tcline_height = variables["Zcdw_pt_South"]
-    #xval = tcline_height
-    #xval = tcline_height
-    #xval = tcline_height - glib
     shelf_depth = variables["Hshelf"]
     randtopog_height = variables["randtopog_height"]
     tcline_height = variables["Zcdw_pt_South"]
-    ax1.scatter(xval,data["theta"],c=color,marker=marker)
-    ax1.set_xlabel("Height above HUB")
-    ax1.set_ylabel("Potential Temperature")
+    ax1.scatter(aisfxval,data["incavity"],c=color,marker=marker)
+    ax1.set_xlabel("avg(ice surface temp * ice surface vel)")
+    ax1.set_ylabel("Melt Rate m/yr")
     ## salt plot
-    ax2.scatter(xval,data["salt"],c=color,marker=marker)
-    ax2.set_xlabel("Height above HUB")
-    ax2.set_ylabel("Salinity")
+    ax2.scatter(aisfxval,data["icesurfacevel"],c=color,marker=marker)
+    ax2.set_xlabel("off shore t^2")
+    ax2.set_ylabel("Ice surface vel")
 
-    ## kinetic energy plot
-    ax3.scatter(xval,data["avgbts"],c=color,marker=marker)
-    ax3.set_xlabel("Height above HUB")
-    ax3.set_ylabel("Kinetic Energy")
+    ax3.scatter((aisfxval*(((tcline_height-75)/2.0+75) - aisf)),-data["shiflx"],c=color,marker=marker)
+    ax3.set_xlabel("(off shore t at aisf) * (thermocline height above aisf)")
+    ax3.set_ylabel("Melt Rate m/yr")
 
-    ax4.scatter(xval,-data["shiflx"],c=color,marker=marker)
-    ax4.set_xlabel("Height above HUB")
+    #ax4.scatter(glib,-data["shiflx"],c=color,marker=marker)
+    ax4.scatter(glibxval*(((tcline_height-75)/2.0+75) - glib),-data["shiflx"],c=color,marker=marker)
+    ax4.set_xlabel("(off shore t at hub) * (thermocline height above hub)")
     ax4.set_ylabel("Melt Rate m/yr")
-    
-    ## kinetic energy plot
-    #totalSHIfwFlx = (ds.SHIfwFlx*ds.XC*ds.YC*ds.Z*ds.hFacC).sum(axis=[1,2,3]).values
-    # bottomtemps = []
-    # surfacetemps = []
-
-    # ax5.scatter(xval,data["bottemp"],c=color,marker=marker)
-    # #ax6.scatter(xval,data["surfacetemp"],c=color)
-    # ax5.set_xlabel("Height above HUB")
-    # ax5.set_ylabel("Bottom Potential Temperature")
-    #ax6.set_xlabel("Height above HUB")
-    #ax6.set_ylabel("Surface Potential Temperature")
 
 def steadyStateAverageSimple(fname,xval,fig,ax1,color="blue",marker="o"):
     data = timeSeries(fname)
@@ -279,7 +342,7 @@ def barotropic_streamfunction_graph(fname,description,times=np.array([]),res=1):
     moviewriter = FFMpegFileWriter(fps=1)
     fig,ax1 = plt.subplots()
     depth = depthFromdZ(ds)
-    UFULL = ds.UVEL.values
+    UFULL = ds.UVEL.values#
     VFULL = ds.VVEL.values
     cavity_mask = (ds.SHIfwFlx[0].values !=0)
     with moviewriter.saving(fig, fpath+"-bt.mp4" , dpi=250):
@@ -436,6 +499,48 @@ def bottomVtop(fname,description,times=np.array([])):
             #cb.remove()
             frame.remove()
 
+def iceFaceMelt(fname,description,times=np.array([])):
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    bmask = bottomMask(fname,ds)
+    icem = icemask(fname,ds)
+    shortname, fpath = outPath(fname) 
+    fig,((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
+    theta = ds.THETA.values
+    uvel = ds.UVEL.values
+    vvel = ds.VVEL.values
+    wvel = ds.WVEL.values
+    mask = np.full_like(uvel[0,0],1,dtype=bool)
+    mask[::4,::4] = 0
+    shifwflx = ds.SHIfwFlx.values
+
+    X,Y = np.meshgrid(range(uvel.shape[2]),range(uvel.shape[3]))
+    for k in tqdm(range(int(ds.UVEL.values.shape[0]))):
+        thetak = theta[k]
+        thetabot = thetak *bmask
+        thetabot[~bmask] = np.nan
+        thetabot = np.nanmean(thetabot,axis=0)
+        utop =  np.nanmean(uvel[k] * icem,axis=0)
+        vtop =  np.nanmean(vvel[k] * icem,axis=0)
+        wtop =  np.nanmean(wvel[k] * icem,axis=0)
+        frame = ax1.pcolormesh(utop)
+        if k==1:
+            cb = plt.colorbar(frame,ax=ax1,pad=0.1)
+        #ax1.quiver(ubot,vbot,scale=1.5)
+
+        thetatop = thetak *icem
+        thetatop[~icem] = np.nan
+        thetatop = np.nanmean(thetatop,axis=0)+1.8
+        frame = ax2.pcolormesh(thetatop)
+        if k==1:
+            cb = plt.colorbar(frame,ax=ax2,pad=0.1)
+
+        ax3.pcolormesh((thetatop**1)*np.sqrt(utop**2+vtop**2+wtop**2))
+        ax4.pcolormesh(-shifwflx[k])
+        plt.show()
+        
+
 def bottomMask(fname,ds,thresh=10):
     vals = grabMatVars(fname,("h","icedraft"))
     h = np.abs(np.asarray(vals["h"]))
@@ -462,7 +567,7 @@ def icemask(fname,ds,thresh=10):
 def outPath(resultspath):
     nameparts = resultspath.split("/")
     shortname = nameparts[-3] + "|" + nameparts[-2]
-    fpath = "/".join((nameparts[:-4]+["pics"] + [shortname]))
+    fpath = "/".join((nameparts[:-5]+["pics"] + [shortname]))
     return shortname, fpath
 
 def crossSectionAnim(fname,description,quant="THETA",res=1):
@@ -485,7 +590,7 @@ def crossSectionAnim(fname,description,quant="THETA",res=1):
         #zvals[zvals==0]=np.nan
         m = np.nanmedian(zvals)
         s = np.nanstd(zvals)
-        tmin, tmax = m-2*s,m+s*2
+        tmin, tmax = m-5*s,m+s*2
         shortname, fpath = outPath(fname) 
         #plt.hist(zvals[:,:,:].flatten())
         #plt.show()
@@ -509,7 +614,7 @@ def crossSectionAnim(fname,description,quant="THETA",res=1):
             elif quant == "THETA":
                 frame = ax1.imshow(zvals[k,:,:],cmap="jet",vmin=-0.5,vmax=1)
             elif quant == "SALT":
-                frame = ax1.imshow(zvals[k,:,:],cmap="jet",vmin=tmin,vmax=tmax)
+                frame = ax1.imshow(zvals[k,:,:],cmap="jet",vmin=34,vmax=34.8)
             else:
                 frame = ax1.imshow(zvals[k,:,:],cmap="jet")
             cb = plt.colorbar(frame)
@@ -633,7 +738,7 @@ def garrettsLittleProject(fname,description,times=np.array([])):
                 What = np.sum(W,axis=0)
                 what = Vhat*llhs
                 what[melt==0]=np.nan
-                llhs[melt==0]=np.nan
+                llhs[melt==0]=np.nan-300
                 Bt[melt==0]=np.nan
                 What[melt==0]=np.nan
                 melt[melt==0]=np.nan
@@ -662,71 +767,16 @@ def garrettsLittleProject(fname,description,times=np.array([])):
     plt.scatter(whatsum,meltsum)
     plt.show()
 
-# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at-125/results","Restricted y domain length with default settings","RHOAnoma")
-# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at0/results","Restricted y domain length with default settings","RHOAnoma")
-# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at125/results","Restricted y domain length with default settings","RHOAnoma")
 
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at125/results","Restricted y domain length with default settings","THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-21/at-400/results","Restricted y domain length with default settings","SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-21/at-400/results","Restricted y domain length with default settings","SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/doublew-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/slope200-GLIB-explore-18/at-125/results","Restricted y domain length with default settings","SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/slope200-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/slope200-GLIB-explore-18/at125/results","Restricted y domain length with default settings","SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at-125/results","Restricted y domain length with default settings","SALT")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at0/results","Restricted y domain length with default settings","SALT")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-highres-GLIB-explore-101/at100d700/results","","THETA")
-#meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-highres-GLIB-explore-101/at100d700/results","")
-#exit()
+crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/inverse-GLIB-explore-32/at125/results/","",quant="SALT")
+#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/icefront-GLIB-explore-32/at-300y250/results/","")
+#meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/icefront-GLIB-explore-32/at-300y250/results/","")
 
-#bottomVtop("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at-125/results","")
-#bottomVtop("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at125/results","")
-#bottomVtop("/home/garrett/Projects/MITgcm_ISC/experiments/slope200-GLIB-explore-18/at125/results","")
-#mixmap("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at-125/results","")
-#mixmap("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/at125/results","")
-
-#bottomVtop("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-21/at-200/results","")
-#meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/icefront-GLIB-explore-32/at125y250/results","")
-#meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/icefront-GLIB-explore-32/at-300y250/results","")
-#exit()
 
 fig,axises = plt.subplots(2,2)
-plt.ylim(0,19)
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-21/*/", recursive = True):
-#     try:
-#         steadyStateAverageSimple(f+"results",0,fig,axises,color="green")
-#     except:
-#         print("nope",f)
-# plt.title("A reference case with a random bathymetry")
-# plt.savefig("/home/garrett/Downloads/agutalk/1.png")
-
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/slope200-GLIB-explore-18/*/", recursive = True):
-#     steadyStateAverageSimple(f+"results",0,fig,axises,color="blue")
-
-# plt.title("Experiment with a smaller cavity slope and a different random bathymetry")
-# plt.savefig("/home/garrett/Downloads/agutalk/2.png")
-
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/*/", recursive = True):
-#     try:
-#         steadyStateAverageSimple(f+"results",0,fig,axises,color="red")
-#     except:
-#         print("nope",f)
-# plt.title("Experiment with a larger cavity slope")
-# plt.savefig("/home/garrett/Downloads/agutalk/3.png")
-
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/GLIB-explore-21/*/", recursive = True):
-#     try:
-#         steadyStateAverageSimple(f+"results",0,fig,axises,color="green")
-#     except:
-#         print("nope",f)
-
-# plt.title("Experiment with yet another random bathymetry")
-# plt.savefig("/home/garrett/Downloads/agutalk/4.png")
-# #steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-30/w50/"+"results",0,fig,axises,color="orange")
-# #steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-30/w100/"+"results",0,fig,axises,color="purple")
-# #steadyStateAverage("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-30/w250/"+"results",0,fig,axises,color="gray")
 
 for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/*/", recursive = True):
+    steadyStateAverage(f+"results",0,fig,axises,color="orange")
     try:
         if "w50" in f:
             steadyStateAverage(f+"results",0,fig,axises,color="orange")
@@ -736,7 +786,6 @@ for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-
             steadyStateAverage(f+"results",0,fig,axises,color="gray")
     except:
         print("nope",f)
-
 # plt.title("Experiments exploring different widths")
 # plt.savefig("/home/garrett/Downloads/agutalk/5.png")
 
@@ -778,6 +827,27 @@ for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/icefront-GLIB-
     except:
         print("nope",f)
 
+
+for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/inverse-GLIB-explore-32/*/", recursive = True):
+    try:
+        steadyStateAverage(f+"results",0,fig,axises,color="red",marker="8")
+    except:
+        print("nope",f)
+
+
+
+
+for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/slope200-GLIB-explore-18/*/", recursive = True):
+    try:
+        steadyStateAverage(f+"results",0,fig,axises,color="black",marker="_")
+    except:
+        print("nope",f)
+
+for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/*/", recursive = True):
+    try:
+        steadyStateAverage(f+"results",0,fig,axises,color="gray",marker="_")
+    except:
+        print("nope",f)
 
 
 
