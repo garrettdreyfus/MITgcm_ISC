@@ -182,8 +182,9 @@ def RdfromFile(fname):
 #plt.ylabel("Depth")
 #plt.show()
 
-print("700",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at0d700/input/metaparameters.mat'))
-print("500",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at0d500/input/metaparameters.mat'))
+#print("700",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at0d700/input/metaparameters.mat'))
+#print("500",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at0d500/input/metaparameters.mat'))
+print("inverse",GLIBfromFile('../experiments/inverse-GLIB-explore-32/at0/input/metaparameters.mat'))
 #print(375,GLIBfromFile('../experiments/slope375-GLIB-explore-18/at-125/input/metaparameters.mat'))
 
 #print("w50",GLIBfromFile('../experiments/widthexp-GLIB-explore-32/w50/input/metaparameters.mat'))
