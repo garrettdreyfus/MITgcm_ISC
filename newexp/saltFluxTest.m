@@ -5,7 +5,7 @@ function saltFluxTest()
   experiment_parameters.tcline_deltaz = 100;
   experiment_parameters.shelf_depth = 550;
   experiment_parameters.cavity_depth = -300;
-  experiment_parameters.cavity_width = 300;
+  experiment_parameters.cavity_width = 150;
   experiment_parameters.trough_depth = 0;
   experiment_parameters.rand_topo = true;
   experiment_parameters.monitor_freq = 6;

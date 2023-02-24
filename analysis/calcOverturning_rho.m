@@ -144,7 +144,7 @@ load([prodir expname '_tavg_5yrs.mat'],'LaVH1RHO','LaHs1RHO','VVEL','THETA','SAL
   salt_tavg(hFacC==0) = NaN;
   %%% Calculate the potential density pt
   refdepth = -zz(layers_krho(1)); %%% equals: sum(DRF(1:layers_krho-1))+DRF(layers_krho)/2;
-  rhoConst = 999.8 %??? is this correct?
+  rhoConst = 1027.0 %??? is this correct?
   g=9.8;
   refpress = rhoConst*(g*refdepth + pressure_tavg(:,:,layers_krho(1)))/1e4; %%% unit: dbar
 %   refpress = refdepth;

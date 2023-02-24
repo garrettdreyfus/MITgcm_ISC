@@ -1,9 +1,9 @@
 function runRandGLIBCheck()
   %% Depth at this seed is 465
-  bath = -475;
+  bath = -430;
   experiment_parameters = struct;
-  experiment_parameters.tcline_deltaz = 250;
-  experiment_parameters.shelf_depth = 650;
+  experiment_parameters.tcline_deltaz = 100;
+  experiment_parameters.shelf_depth = 600;
   experiment_parameters.cavity_depth = -300;
   experiment_parameters.trough_depth = 0;
   experiment_parameters.rand_topo = true;
@@ -16,10 +16,10 @@ function runRandGLIBCheck()
   experiment_parameters.cavity_width = 150;
 
   currentFolder = pwd;
-  depths = [ -200 -125 -50 0 50 125 200] ;
+  depths = [ -400] ;
   for k = depths
     experiment_parameters.tcline_atshelf_depth = bath+k;
-    path_part1 = convertStringsToChars(strcat("experiments/tclinedz250-GLIB-explore-",int2str(rng_seed),"/"));
+    path_part1 = convertStringsToChars(strcat("experiments/GLIB-explore-",int2str(rng_seed),"/"));
     path_part2 = convertStringsToChars(strcat("at",int2str(k)));
     full_path = convertStringsToChars(strcat("../",path_part1,path_part2));
     newexp(path_part1,path_part2,experiment_parameters);
