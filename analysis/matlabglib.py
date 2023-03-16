@@ -132,8 +132,6 @@ def GLIBfromFile(fname,full=False):
     variables = scipy.io.loadmat(fname,variable_names=('h','icedraft'))
     icedraft = np.asarray(variables["icedraft"])
     h = np.asarray(variables["h"])
-    plt.imshow(h)
-    plt.show()
     icedraft[icedraft==0] = np.nan
     icedraft[h==0] = 0
     GLIB = generateBedmapGLIBs(h,icedraft)
@@ -199,7 +197,6 @@ def RdfromFile(fname):
 
 #print("700",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at0d700/input/metaparameters.mat'))
 #print("500",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at0d500/input/metaparameters.mat'))
-print("inverse",GLIBfromFile('../experiments/inverse-GLIB-explore-32/at0/input/metaparameters.mat'))
 
 #variables = scipy.io.loadmat('../experiments/GLIB-explore/under/input/metaparameters.mat',variable_names=('h','icedraft'))
 # variables = scipy.io.loadmat('../experiments/smallerslope-GLIB-explore-18/at-125/input/metaparameters.mat',variable_names=('h','icedraft'))
