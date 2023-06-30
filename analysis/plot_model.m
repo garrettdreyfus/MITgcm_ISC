@@ -63,6 +63,12 @@ function plot_model(expdir,expname,outputname)
     [YY,XX,ZZ]=meshgrid(yy/1000,xx/1000,zz/1000);
     [ZZZ,YYY] = meshgrid(zz/1000,yy/1000);
 
+      idx_1 = 1;
+    BC_u = squeeze(uu(idx_1,:,:));
+    BC_u(BC_u==0) = NaN;
+    BC_t = squeeze(tt(end,:,:));
+    BC_s = squeeze(ss(idx_1,:,:));
+
     %%% Extract zonal boundary values
     idx_1 = 10;
     %%% Calculate the restoring neutral density at the zonal boundaries
@@ -75,7 +81,9 @@ function plot_model(expdir,expname,outputname)
     clf;    
     
     %%% Bathymetry  
-    p = surface(X(:,2:end-1),Y(:,2:end-1),-h(:,2:end-1)/1000);
+    hfilled = -h/1000;
+    hfilled(:,end)=max(max(abs(ZZZ)));
+    p = surface(X,Y,hfilled);
     p.FaceColor = [11*16+9 9*16+12 6*16+11]/255;
     p.FaceColor = bathycolor;
     p.EdgeColor = 'none';
@@ -111,9 +119,18 @@ function plot_model(expdir,expname,outputname)
     %%% contours + thermal wind velocity
 
     % Plot the restoring temperature
-    ZZZ(:,end)=-2;
-    colormap(colormap(cmocean('balance',ncolor)))
-    caxis([-2.3 2.3]);
+    %BC_t(abs(ZZZ)>max(hfilled(end,:)))=NaN;
+    p_bct = surface(xx(end)/1000*ones(size(YYY)),YYY,-ZZZ,BC_t);
+    colormap('jet');
+%     colormap(cmocean('balance'))
+    %colormap(cmocean('diff'))
+    alpha(p_bct,1);
+    %colormap(colormap(cmocean('balance',ncolor)))
+    caxis([-2 1]);
+    handle_tt = colorbar(gca);
+    set(handle_tt,'TickLabels', [-2,0,1 ],'Ticks', [-2,0,1 ]);
+    set(handle_tt,'Position',[0.75    0.3    0.0045    0.15]);
+    annotation('textbox',[0.6 0.425 0.15 0.01],'String',{'Restoring';'temperature';['(' char(176) 'C)']},'FontSize',fontsize-1,'LineStyle','None','horizontalAlignment','right');
     p_bct.FaceColor = 'texturemap';
     p_bct.EdgeColor = 'none';         
     %freezeColors;
@@ -151,8 +168,3 @@ function plot_model(expdir,expname,outputname)
 end
     
 
-
-%expname = 'at0d200'
-%outputname = 'shelfdepthd200'
-%expdir = '/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/'
-%plot_model(expdir,expname,outputname)
