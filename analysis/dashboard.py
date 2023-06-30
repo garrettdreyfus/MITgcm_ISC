@@ -181,7 +181,10 @@ def volume(fname):
     grad = np.gradient(icedraft)
     grad[0] = (grad[0]/np.gradient(xx)[10])**2
     grad[1] = (grad[1]/np.gradient(yy)[10])**2
-    grad = np.sqrt(grad[0] + grad[1])
+    print(grad)
+    #grad = np.sqrt(grad[0] + grad[1])
+    grad = np.sqrt(np.sum(grad,axis=0))
+
     return np.nanmedian(grad[np.logical_and(icedraft!=0,diff!=0)])#np.mean(diff[np.logical_and(icedraft!=0,diff!=0)]) #+ abs(zglib-zgl)/y
 
 def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o",title=""):
@@ -193,7 +196,7 @@ def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o",title=""):
     for k in data.keys():
         if k != "ts":
             try:
-                data[k] = np.nanmean(data[k][data["ts"]>2])
+                data[k] = np.nanmean(data[k][data["ts"]>5])
             except:
                 data[k]=np.nan
     if "gprime" not in data.keys():
@@ -219,9 +222,9 @@ def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o",title=""):
     shelf_width = variables["Xeast"]-variables["Xwest"]
     randtopog_height = variables["randtopog_height"]
     max_height = variables["Zcdw_pt_South"][0][0]
-    ax1.scatter(shelf_width,lightdens,c=color,marker=marker)
-    ax1.set_xlabel("Cavity Width AKA Lx")
-    ax1.set_ylabel("sigma0 at ice interface")
+    #ax1.scatter(shelf_width,lightdens,c=color,marker=marker)
+    #ax1.set_xlabel("Cavity Width AKA Lx")
+    #ax1.set_ylabel("sigma0 at ice interface")
     ## salt plot
     print(data)
     ax2.scatter(shelf_width,data["gprime"],c=color,marker=marker)
@@ -235,9 +238,21 @@ def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o",title=""):
     
     #ax4.scatter(glib,-data["shiflx"],c=color,marker=marker)
     zpyci = np.argmin(np.abs(np.abs(zz)-abs(tcline_height)))
-    localdens = dens(sNorth,tNorth,abs(tcline_height))
+    glibi = np.argmin(np.abs(np.abs(zz)-abs(glib)))
+    localdens = dens(sNorth,tNorth,abs(0))
+    print(localdens)
+    print(1)
+    drhodz = np.diff(localdens)/np.diff(zz)
+    print(2)
+    zpyc = np.nanmean(zz[1:][drhodz>np.nanquantile(drhodz,0.90)])
+    print(3)
+    print(zpyc,zz)
+    zpyci = np.nanargmin(np.abs(np.abs(zz)-abs(zpyc)))
     #gprime = (localdens[zpyci-10] - localdens[zpyci+10])/(zz[zpyci-10] - zz[zpyci+10])
-    gprime = (np.mean(localdens[zpyci:])-np.mean(localdens[:zpyci]))
+    print(4)
+    gprime = 9.8*(np.mean(localdens[zpyci:glibi])-np.mean(localdens[:zpyci]))/np.mean(localdens[:glibi])
+    print(5)
+    ax1.scatter(gprime*shelf_width,data["gprime"],c=color,marker=marker)
     print(lightdens)
     #print(gprime)
     ax4.scatter((glibxval)*ices*(deltaH)*gprime,-data["shiflx"],c=color,marker=marker)
@@ -260,16 +275,23 @@ def steadyStateAverageSimple(fname,xval,fig,ax1,title="",color="blue",marker="o"
     if "gprime" not in data.keys():
         data["gprime"] = np.nan
 
-    variables = grabMatVars(fname,("Hshelf","Xeast","Xwest","randtopog_height","Yicefront","Zcdw_pt_South","tEast","sEast","icedraft","zz","h"))
+    variables = grabMatVars(fname,("Hshelf","Xeast","Xwest","randtopog_height","Yicefront","Zcdw_pt_South","tEast","sEast","icedraft","zz","h","yy","xx"))
     y = np.asarray(variables["Yicefront"])[0][0]
 
     icedraft = np.asarray(variables["icedraft"])
     h = np.asarray(variables["h"])
-
+    #
     icemask = np.logical_and(icedraft!=0,np.abs(np.abs(icedraft)-np.abs(h))>5)
-
+    
+    #
     lightdens = dens(np.asarray(data["icesurfacesalt"]),np.asarray(data["icesurfacetemp"]),0)
     zz = np.asarray(variables["zz"])[0]
+    yy = np.asarray(variables["yy"])[0]
+    xx = np.asarray(variables["xx"])[0]
+    __, YY = np.meshgrid(xx,yy)
+
+
+
     tNorth = np.asarray(variables["tEast"])[-1,:]
     sNorth = np.asarray(variables["sEast"])[-1,:]
     rho0 = dens(sNorth,tNorth,0)
@@ -280,9 +302,19 @@ def steadyStateAverageSimple(fname,xval,fig,ax1,title="",color="blue",marker="o"
     ices,beds = slope(aisf,fname)
     ices = volume(fname)
 
-    ax1.set_xlabel("Thermocline height above HUB")
-    ax1.set_ylabel("Melt Rate m/yr")
-    plt.title(title)
+    icedepths = icedraft[icemask]
+    icets = []
+    for l in icedepths:
+        icets.append(tNorth[np.argmin(np.abs(np.abs(zz)-min(abs(l),abs(glib))))]+1.8)
+
+    # if color =="purple" and marker =="x":
+    #     plt.hist(icets)
+    #     plt.title(fname)
+    #     plt.show()
+    #
+    #ax1.set_xlabel("Average offshore temperature above HUB")
+    #ax1.set_ylabel("Melt Rate m/yr")
+    #plt.title(title)
     #plt.xlim(-350,0)
     #plt.ylim(0,25)
     shelf_depth = variables["Hshelf"]
@@ -291,13 +323,32 @@ def steadyStateAverageSimple(fname,xval,fig,ax1,title="",color="blue",marker="o"
     max_height = variables["Zcdw_pt_South"][0][0]
     tcline_height = (max_height-75)/2.0+75
 
-    zpyci = np.argmin(np.abs(np.abs(zz)-abs(tcline_height)))
-    localdens = dens(sNorth,tNorth,abs(tcline_height))
-    gprime = (np.mean(localdens[zpyci:])-np.mean(localdens[:zpyci]))/np.mean(localdens)
+    print(YY.shape)
+    hotice = np.abs(icedraft)>abs(tcline_height)
+    hotice[icemask]=False
+    print(YY.shape,hotice.shape)
+    extent = np.ptp(YY[hotice.T])
 
+    hotice = hotice>0
+
+
+    zpyci = np.argmin(np.abs(np.abs(zz)-abs(tcline_height)))
+    localdens = dens(sNorth,tNorth,0)
+    gprime_ext = 9.8*(np.mean(localdens[zpyci:])-np.mean(localdens[:zpyci]))/np.mean(localdens)
     deltaH = -(abs(tcline_height)- abs(glib))
     print(abs(deltaH))
-    ax1.scatter((glibxval)*glibxval*ices,-data["shiflx"],c=color,marker=marker)
+    tavg = np.mean(tNorth[np.abs(zz)<abs(glib)]+1.8)
+    f = 1.3*10**-4
+    rho0 = 1025
+    Cp = 3850
+    spy = (3.154*10**7)
+    melten = 3.34*10**5
+    kgtom = 920
+    Lscale = 20000#+ 0.005/shelf_width
+    melt = deltaH*(glibxval-1.8+273.15)*ices*(1/f)*gprime_ext*(spy*Cp*rho0)/(melten*kgtom*Lscale)
+    #ax1.plot(range(26),range(26))
+    ax1.scatter(glibxval*deltaH*gprime_ext/f*ices,-data["shiflx"],c=color,marker=marker)
+    #ax1.scatter(ices,-data["shiflx"],c=color,marker=marker)
     #ax1.scatter(tcline_height-glib,-data["shiflx"],c=color,marker=marker)
 
 
@@ -601,6 +652,7 @@ def icemask(fname,ds,thresh=10):
 
 def fullOnGPrime(ds,fname):
     THETA = ds.THETA.values
+    print(ds.THETA)
     SALT = ds.SALT.values
     vals = grabMatVars(fname,("icedraft"))
     icedraft = np.abs(np.asarray(vals["icedraft"]))
@@ -609,21 +661,25 @@ def fullOnGPrime(ds,fname):
     print("GPRIME TIME")
     for t_index in tqdm(range(THETA.shape[0])):
         gprimes_t = []
+        #gprimemap = np.full_like(THETA[0,0,:,:],np.nan)
         for y_index in range(THETA.shape[2]):
             for x_index in range(THETA.shape[3]):
                 tcast = THETA[t_index,:,y_index,x_index]
-                if (np.sum(~np.isnan(tcast)))>10 and idmask[x_index,y_index]:
-                    scast = SALT[t_index,:,y_index,x_index]
-                    t = tcast[~np.isnan(scast)]
-                    s = scast[~np.isnan(scast)]
-                    d = dens(s,t,500)
+                scast = SALT[t_index,:,y_index,x_index]
+                if (np.sum(abs(scast)>0.1)>10) and idmask[x_index,y_index] and y_index<60:
+                    t = tcast[scast>0.1]
+                    s = scast[scast>0.1]
+                    d = dens(s,t,0)
                     if np.sum(d-d[0]>0.03)>0:#and np.sum(t>0.5)>0:
                         mldi = np.where(d-d[0]>0.03)[0][0]
                         #cdwi = np.where(t>0)[0][0]
                         rho_1 = np.nanmean(d[:mldi])
-                        rho_2 = np.nanmean(d[mldi:])
-                        gprimes_t.append((rho_2-rho_1)/np.mean((rho_1,rho_2)))
-        gprimes.append(np.nanmean(gprimes_t))
+                        rho_2 = np.nanmean(d[mldi:min(mldi*2,len(d)-1)])
+                        gprimes_t.append(9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2)))
+                        #gprimemap[y_index,x_index] = gprimes_t[-1]
+        #plt.imshow(gprimemap)
+        #plt.show()
+        gprimes.append(np.nanmedian(gprimes_t))
     return gprimes
 
 
@@ -797,8 +853,9 @@ def generateRunsTable(fnames):
     return table
         
 
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w100/results/","",dim="meridional",quant="DENS")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w50/results/","",dim="meridional",quant="DENS")
+# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at0d400/results/","",dim="zonal",quant="THETA")
+# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at125d400/results/","",dim="zonal",quant="THETA")
+# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at-300d400/results/","",dim="zonal",quant="THETA")
 #crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w250/results/","",dim="meridional",quant="DENS")
 #meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w100/results/","")
 #meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w50/results/","")
@@ -824,10 +881,24 @@ def generateRunsTable(fnames):
 # generateRunsTable(fnames)
 #
 #
+def legendFunction(runsdict):
+    conversion={"d0":"cavityd0","d-200":"cavityd-200","slope200":"cavityd200","slope375":"cavityd375"}
+    for k in runsdict.keys():
+        for l in range(len(runsdict[k]["specialstring"])):
+            if not runsdict[k]["specialstring"][0]:
+                ss = k.split("-")[0]
+            else:
+                ss = runsdict[k]["specialstring"][l]
+            if ss in conversion.keys():
+                ss = conversion[ss]
+            plt.scatter(1,1,marker=runsdict[k]["marker"][l],color=runsdict[k]["color"][l],label=ss)
+    plt.legend()
+    plt.show()
+            
 
 
 def folderMap(runsdict,save=True):
-    fig,axises = plt.subplots(1,1)
+    fig,axises = plt.subplots(1,1,figsize=(8,7))
     for k in runsdict.keys():
         print(k)
         for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
@@ -847,14 +918,19 @@ def folderMap(runsdict,save=True):
                 plt.savefig("/home/garrett/Projects/HUB/paperfigures/"+k+".png")
         
 runsdict = {\
-        "widthexp-GLIB-explore-32":{"specialstring":['w50','w100','w250'], "marker":["o","o","o"] ,"color":["orange","purple","gray"],"description":["Different shelf widths" ]},\
-        "shelfzexp-GLIB-explore-101":{"specialstring":['d200','d400','d500','d700','d800'], "marker":["x","x","x","x","x"] ,"color":["orange","purple","gray","green","red"],"description":["Different shelf depths"]},\
-        "icefront-GLIB-explore-32":{"specialstring":['y100','y250','y280'], "marker":["^","^","^"] ,"color":["orange","purple","gray"],"description":["Different ice front distances"]},\
         "inverse-GLIB-explore-32":{"specialstring":['d0','d-200'], "marker":["D","D"] ,"color":["purple","orange"],"description":["Without a sill"]},\
+        "shelfzexp-GLIB-explore-101":{"specialstring":['d200','d400','d500','d700','d800'], "marker":["x","x","x","x","x"] ,"color":["orange","purple","gray","green","red"],"description":["Different shelf depths"]},\
+        "widthexp-GLIB-explore-32":{"specialstring":['w50','w100','w250'], "marker":["o","o","o"] ,"color":["orange","purple","gray"],"description":["Different shelf widths" ]},\
+        "icefront-GLIB-explore-32":{"specialstring":['y100','y250','y280'], "marker":["^","^","^"] ,"color":["orange","purple","gray"],"description":["Different ice front distances"]},\
         "slope200-GLIB-explore-18":{"specialstring":[False], "marker":["_"] ,"color":["orange"],"description":["Less steep slope"]},\
         "slope375-GLIB-explore-18":{"specialstring":[False], "marker":["_"] ,"color":["purple"],"description":["more steep slope"]}\
         }
+#legendFunction(runsdict)
 folderMap(runsdict,save=False)
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+plt.plot(range(30),range(30))
+plt.ylabel(r'$\dot{m}_{obs} (m/yr)$',fontsize=18)
 
 plt.show()
 
