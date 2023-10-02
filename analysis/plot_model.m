@@ -3,7 +3,7 @@
 %%%
 %%% Plot the model configuration for the undercurrent project 
 %%%
-function plot_model(expdir,expname,outputname)
+function plot_model(expdir,expname,outputname,boundary)
 
     close all;
 
@@ -35,7 +35,7 @@ function plot_model(expdir,expname,outputname)
     icetopcolor = [123 161 210]/255;
     boxcolor = [0.85 0.85 0.85];
     % isothermcolor = [87 151 246]/255;
-    isothermcolor = [103 86 190]/255;
+    isothermcolor =  [238 131 70]/255;
     
     %%% Calculate CDW layer properties
 %     prodir = [expdir expname '/'];
@@ -63,11 +63,13 @@ function plot_model(expdir,expname,outputname)
     [YY,XX,ZZ]=meshgrid(yy/1000,xx/1000,zz/1000);
     [ZZZ,YYY] = meshgrid(zz/1000,yy/1000);
 
-      idx_1 = 1;
-    BC_u = squeeze(uu(idx_1,:,:));
-    BC_u(BC_u==0) = NaN;
-    BC_t = squeeze(tt(end,:,:));
-    BC_s = squeeze(ss(idx_1,:,:));
+    if boundary
+        idx_1 = 1;
+        BC_u = squeeze(uu(idx_1,:,:));
+        BC_u(BC_u==0) = NaN;
+        BC_t = squeeze(tt(end,:,:));
+        BC_s = squeeze(ss(idx_1,:,:));
+    end
 
     %%% Extract zonal boundary values
     idx_1 = 10;
@@ -111,28 +113,33 @@ function plot_model(expdir,expname,outputname)
     p.FaceColor = icetopcolor;
     p.EdgeColor = 'none';
     alpha(p,1);
+    if boundary
+        ttmod = tt;
+        ttmod(5,:,:)=NaN;
 
+        ttmod(xx<-50000,:,:)=NaN;
+        ttmod(:,:,-zz>1000)=NaN;
 
+        is = isosurface(XX,YY,-ZZ,ttmod,0);
+        is= patch(is)
 
-
-    %%% Plot zonal boundary conditions: temperature field + neutral density
-    %%% contours + thermal wind velocity
-
-    % Plot the restoring temperature
-    %BC_t(abs(ZZZ)>max(hfilled(end,:)))=NaN;
-    p_bct = surface(xx(end)/1000*ones(size(YYY)),YYY,-ZZZ,BC_t);
-    colormap('jet');
-%     colormap(cmocean('balance'))
-    %colormap(cmocean('diff'))
-    alpha(p_bct,1);
-    %colormap(colormap(cmocean('balance',ncolor)))
-    caxis([-2 1]);
-    handle_tt = colorbar(gca);
-    set(handle_tt,'TickLabels', [-2,0,1 ],'Ticks', [-2,0,1 ]);
-    set(handle_tt,'Position',[0.75    0.3    0.0045    0.15]);
-    annotation('textbox',[0.6 0.425 0.15 0.01],'String',{'Restoring';'temperature';['(' char(176) 'C)']},'FontSize',fontsize-1,'LineStyle','None','horizontalAlignment','right');
-    p_bct.FaceColor = 'texturemap';
-    p_bct.EdgeColor = 'none';         
+        is.FaceColor = isothermcolor;
+        is.EdgeColor = 'none';
+        alpha(is,0.5);
+        p_bct = surface(xx(end)/1000*ones(size(YYY)),YYY,-ZZZ,BC_t);
+        colormap(cmocean('thermal'));
+    %     colormap(cmocean('balance'))
+        %colormap(cmocean('diff'))
+        alpha(p_bct,1);
+        %colormap(colormap(cmocean('balance',ncolor)))
+        caxis([-2 1]);
+        handle_tt = colorbar(gca);
+        set(handle_tt,'TickLabels', [-2,0,1 ],'Ticks', [-2,0,1 ]);
+        set(handle_tt,'Position',[0.75    0.3    0.0045    0.15]);
+        annotation('textbox',[0.6 0.425 0.15 0.01],'String',{'Restoring';'temperature';['(' char(176) 'C)']},'FontSize',fontsize-1,'LineStyle','None','horizontalAlignment','right');
+        p_bct.FaceColor = 'texturemap';
+        p_bct.EdgeColor = 'none';         
+    end
     %freezeColors;
 
     %%% Decorations
@@ -156,8 +163,6 @@ function plot_model(expdir,expname,outputname)
     lighting flat;
     box on;
     grid off;
-
-
 
 
 

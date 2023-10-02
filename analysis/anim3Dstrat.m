@@ -49,16 +49,16 @@ for n=5:length(dumpIters)
   tt =  (dumpIters(n)-dumpIters(1))*deltaT/86400
 
   %%% Load time-mean output
-  load(fullfile(prodir,[expname,'_tavg_5yrs.mat']),'PHIHYD');
-  pp = PHIHYD;
-  eta = pp(:,:,1)/gravity;
-  eta(:,1) = NaN;
-  eta(:,end) = NaN;
-  eta = eta - mean(eta(:,end-1));
+  %load(fullfile(prodir,[expname,'_tavg_5yrs.mat']),'PHIHYD');
+  %pp = PHIHYD;
+  %eta = pp(:,:,1)/gravity;
+  %eta(:,1) = NaN;
+  %eta(:,end) = NaN;
+  %%eta = eta - mean(eta(:,end-1));
 
   %%% Remove topography
   theta(hFacC==0) = NaN;
-  eta(hFacC(:,:,1)==0) = NaN;
+  %eta(hFacC(:,:,1)==0) = NaN;
 
   fig = figure(1);
   clf;
