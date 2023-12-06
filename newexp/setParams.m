@@ -425,6 +425,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   Hmin = 50;
   wct = icedraft - h;
   h(wct < Hmin) = icedraft(wct < Hmin);
+
+  save("temptopo.mat","h","icedraft")
+  [status,cmdout] = system("python matlabglib.py temptopo.mat");
+  HUB = str2num(cmdout);
   
   
   %%% Plot bathymetry and ice draft
@@ -489,7 +493,9 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   %%% Bottom properties offshore, taken from Meijers et al. (2010)
   %%% measurements. We need these because the KN climatology only goes down
   %%% to 2000m
+  %s_bot = 34.7;
   s_bot = 34.65;
+  %s_bot = 37;
   pt_bot = -0.5;
   s_mid = 34.67;
   pt_mid = 1;
@@ -500,7 +506,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   % at -1000
   % at -1500
   
-  Zcdw_pt_shelf = experiment_parameters.tcline_atshelf_depth; %%% CDW depth over the shelf
+  Zcdw_pt_shelf = HUB+experiment_parameters.tcline_atshelf_depth; %%% CDW depth over the shelf
   Zcdw_pt_South = Zcdw_pt_shelf + experiment_parameters.tcline_deltaz; %%% CDW depth at the southern boundary
 
   lat_Zcdw_pt = [0 Yshelfbreak Ydeep Ly];
@@ -771,6 +777,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   %%% Align initial temp with background
   hydroTh = ones(Nx,Ny,Nr);
   hydroSa = ones(Nx,Ny,Nr);
+
+
   if isfield(experiment_parameters,'initial_state') && experiment_parameters.initial_state == "cold"
     for k=1:1:Nr
 	hydroTh(:,:,k) = squeeze(hydroTh(:,:,k))*tNorth(k);
@@ -782,7 +790,16 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
 	hydroSa(:,:,k) = squeeze(hydroSa(:,:,k))*sNorth(k);
     end
   end
-  
+
+  %%for ix=1:Nx
+      %for iy=1:Ny
+              %if yy(iy) < Yicefront
+                      %hydroTh(ix,iy,:) = tNorth+min(abs(yy(iy)-Yicefront)/75000,1)*(pt_surf-tNorth);
+                      %hydroSa(ix,iy,:) = sNorth+min(abs(yy(iy)-Yicefront)/75000,1)*(s_surf-sNorth);
+              %end
+      %end
+  %end
+
   %%% Add some random noise  
   hydroTh = hydroTh + tNoise*(2*rand(Nx,Ny,Nr)-1);
   hydroSa = hydroSa + sNoise*(2*rand(Nx,Ny,Nr)-1);  
@@ -1430,8 +1447,12 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
 
 
   %%% Annual mean diagnostics
-  diag_fields_avg = {'SHIfwFlx','SALT','THETA','momKE','RHOAnoma','LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO',...
-		     'UVEL','VVEL','WVEL','PHIHYD','ETAN','KPPdiffS','KPPdiffT','KPPghatK','KPPhbl','MXLDEPTH'};%%% Basic state 
+  %diag_fields_avg = {'SHIfwFlx','SHIhtFlx','SHIForcT','SHIForcS','SALT','THETA','momKE','RHOAnoma','LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO',...
+		     %'UVEL','VVEL','WVEL','PHIHYD','ETAN','KPPdiffS','KPPdiffT','KPPghatK','KPPhbl','MXLDEPTH',...
+                     %'KPPnuddt','KPPnudds','KPPRi','KPPdbloc','KPPshsq','KPPg_TH','KPPg_SLT'};%%% Basic state 
+
+  diag_fields_avg = {'SHIfwFlx','SHIhtFlx','SHIForcT','SHIForcS','SALT','THETA','momKE','RHOAnoma','LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO',...
+		     'UVEL','VVEL','WVEL','PHIHYD','ETAN','MXLDEPTH'};%%% Basic state 
   % % %      'TOTTTEND','TFLUX','ADVy_TH','VVELTH','oceQnet',...%%% Heat budget
   % % %      'UVELSQ','VVELSQ','WVELSQ','UV_VEL_Z','WU_VEL','WV_VEL',...%%% Energy budget
   % % %      'LaVH1RHO','LaHs1RHO',...%%% Overturning circ
@@ -1476,6 +1497,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   numdiags_avg = length(diag_fields_avg);  
   diag_freq_avg = (t1year/12.0)*experiment_parameters.monitor_freq;
 
+
   diag_phase_avg = 0;    
       
   for n=1:numdiags_avg    
@@ -1497,11 +1519,11 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   %%   'SIarea','SIheff','SIuice','SIvice' ...
   %%     };
   diag_fields_inst = {...
-    'UVEL','VVEL','WVEL','THETA','SALT','ETAN'};
+    'UVEL','VVEL','WVEL','THETA','SALT','ETAN','SHIfwFlx'};
 
 
   numdiags_inst = length(diag_fields_inst);  
-  diag_freq_inst = 1*t1year;
+  diag_freq_inst = (t1year/12.0)*experiment_parameters.monitor_freq;
 %   diag_freq_inst = 7*t1day;
   diag_phase_inst = 0;
   

@@ -9,6 +9,7 @@ function runWidthCheck()
   rng_seed = 32;
   experiment_parameters.rng_seed = rng_seed;
   experiment_parameters.random_amplitude = 250;
+  experiment_parameters.yicefront = 150;
   experiment_parameters.saltflux = false;
   experiment_parameters.rbcs_temp = false;
   experiment_parameters.cavity_depth = -300;
@@ -16,14 +17,14 @@ function runWidthCheck()
   cavity_widths = [ 50,100,250];
   baths= [-465 -470 -480];
   indexs=[1 2 3];
-  tcline_heights = [ -300, 0, 125 ]
+  tcline_heights = [ 125, 0, -300 ]
   for i = indexs
     w = cavity_widths(i);
     bath = baths(i);
     for k = tcline_heights
         experiment_parameters.tcline_atshelf_depth = bath+k;
         experiment_parameters.cavity_width = w;
-        path_part1 = convertStringsToChars(strcat("experiments/widthexp-GLIB-explore-",int2str(rng_seed),"/"));
+        path_part1 = convertStringsToChars(strcat("experiments/widthexprevertnokpp-GLIB-explore-",int2str(rng_seed),"/"));
         path_part2 = convertStringsToChars(strcat("at",int2str(k),"w",int2str(w)));
         full_path = convertStringsToChars(strcat("../",path_part1,path_part2));
         newexp(path_part1,path_part2,experiment_parameters);
