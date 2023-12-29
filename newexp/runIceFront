@@ -1,0 +1,34 @@
+function runIceFront()
+  %% Depth at this seed is 465
+  experiment_parameters = struct;
+  experiment_parameters.tcline_deltaz = 100;
+  experiment_parameters.shelf_depth = 650;
+  experiment_parameters.trough_depth = 0;
+  experiment_parameters.rand_topo = true;
+  experiment_parameters.monitor_freq = 6;
+  rng_seed = 64;
+  experiment_parameters.rng_seed = rng_seed;
+  experiment_parameters.random_amplitude = 250;
+  experiment_parameters.saltflux = false;
+  experiment_parameters.rbcs_temp = false;
+  experiment_parameters.cavity_depth = -300;
+  experiment_parameters.cavity_width = 150;
+  currentFolder = pwd;
+  ice_fronts = [100 250];
+  indexs=[1 2];
+  tcline_heights = [ -300, 0, 125 ]
+  for i = indexs
+    y = ice_fronts(i);
+    for k = tcline_heights
+        experiment_parameters.tcline_atshelf_depth = k;
+        experiment_parameters.yicefront = y;
+        path_part1 = convertStringsToChars(strcat("experiments/icefront-",int2str(rng_seed),"/"));
+        path_part2 = convertStringsToChars(strcat("at",int2str(k),"y",int2str(y)));
+        full_path = convertStringsToChars(strcat("../",path_part1,path_part2));
+        newexp(path_part1,path_part2,experiment_parameters);
+        cd(full_path);
+        system('sh upload_to_cluster.sh')
+        cd(currentFolder);
+    end
+  end
+end
