@@ -24,16 +24,15 @@ from matplotlib.patches import Polygon
 
 #matplotlib.use("TkAgg")
 
-def timeSeries(fname):
+def timeSeries(fname,refresh=False):
 
     fnameparts = fname.split("/")
     slug = fnameparts[-3]+"-"+fnameparts[-2]+".pickle"
 
-    if os.path.isfile("data/modelTimeSeries/"+slug) and True:
+    if os.path.isfile("data/modelTimeSeries/"+slug) and not refresh:
         with open("data/modelTimeSeries/"+slug,"rb") as f:
             output = pickle.load(f)
         return output
-
 
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
@@ -119,8 +118,8 @@ def timeSeries(fname):
         icesurfacesalts.append(np.nansum(SALT[k][icem])/np.sum(icem))
         meltapprox.append(np.nansum((THETA[k]*VEL[k])[icem])/np.sum(icem))
 
-    gprimes = []#fullOnGPrime(ds,fname)
-    print("GPRIMES",gprimes)
+    gprimes,ssurf,scdw,tsurf,tcdw,froude = mixedLayerQuant(ds,fname)
+    #gprimes,ssurf,scdw,tsurf,tcdw,froude = (np.nan,np.nan,np.nan,np.nan,np.nan,np.nan)
     ###output = {"ts":np.asarray(ts)[nanmask],"theta":np.asarray(thetas)[nanmask],"salt":np.asarray(salts)[nanmask],\
         #"kes":np.asarray(kes)[nanmask],"avgbts":np.asarray(avgbts)[nanmask],\
         #"shiflx":np.asarray(shiwflxs)[nanmask],"bottemp":np.asarray(bottomtemps)[nanmask],"icesurfacetemp":np.asarray(icesurfacetemps)[nanmask],\
@@ -131,7 +130,9 @@ def timeSeries(fname):
         "shiflx":np.asarray(shiwflxs)[nanmask],"bottemp":np.asarray(bottomtemps)[nanmask],"icesurfacetemp":np.asarray(icesurfacetemps)[nanmask],\
         "icesurfacesalt":np.asarray(icesurfacesalts)[nanmask],\
         "icesurfacevel":np.asarray(icesurfacevels)[nanmask],"meltapprox":np.asarray(meltapprox)[nanmask],\
-        "incavity":np.asarray(incavity)[nanmask],"gprime":np.asarray(gprimes)}
+        "incavity":np.asarray(incavity)[nanmask],"gprime":np.asarray(gprimes),\
+        "ssurf":np.asarray(ssurf),"scdw":np.asarray(scdw),"tsurf":np.asarray(tsurf),"tcdw":np.asarray(tcdw),"froude":np.asarray(froude)\
+    }
     with open("data/modelTimeSeries/"+slug,"wb") as f:
         pickle.dump(output,f)
     return output
@@ -145,7 +146,6 @@ def grabMatVars(fname,val_tup):
     return variables
 
 def intTemp(depth,fname):
-    print(depth)
     variables = grabMatVars(fname,('tNorth','tEast','zz',''))
     tEast = np.asarray(variables["tEast"])#[0]+1.8
     zz = np.asarray(variables["zz"])[0]
@@ -158,7 +158,6 @@ def intTemp(depth,fname):
     return result
 
 def maxTemp(depth,fname):
-    print(depth)
     variables = grabMatVars(fname,('tNorth','tEast','zz',''))
     tEast = np.asarray(variables["tEast"])#[0]+1.8
     zz = np.asarray(variables["zz"])[0]
@@ -176,7 +175,6 @@ def slope(zglib,fname):
     y = np.asarray(variables["Yicefront"])[0][0]
     icedraft = np.asarray(variables["icedraft"])
     zgl = np.nanmin(icedraft)-np.nanmax(icedraft[icedraft!=0])
-    print("slopes",zgl/y)
     return (abs(zgl)-200)/y , abs(zglib-zgl)/y
 
 def volume(fname):
@@ -193,7 +191,6 @@ def volume(fname):
     grad = np.gradient(icedraft)
     grad[0] = (grad[0]/np.gradient(xx)[10])**2
     grad[1] = (grad[1]/np.gradient(yy)[10])**2
-    print(grad)
     #grad = np.sqrt(grad[0] + grad[1])
     grad = np.sqrt(np.sum(grad,axis=0))
 
@@ -238,7 +235,6 @@ def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o",title=""):
     #ax1.set_xlabel("Cavity Width AKA Lx")
     #ax1.set_ylabel("sigma0 at ice interface")
     ## salt plot
-    print(data)
     ax2.scatter(shelf_width,data["gprime"],c=color,marker=marker)
     ax2.set_xlabel("")
     ax2.set_ylabel("")
@@ -252,20 +248,12 @@ def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o",title=""):
     zpyci = np.argmin(np.abs(np.abs(zz)-abs(tcline_height)))
     glibi = np.argmin(np.abs(np.abs(zz)-abs(glib)))
     localdens = dens(sNorth,tNorth,abs(0))
-    print(localdens)
-    print(1)
     drhodz = np.diff(localdens)/np.diff(zz)
-    print(2)
     zpyc = np.nanmean(zz[1:][drhodz>np.nanquantile(drhodz,0.90)])
-    print(3)
-    print(zpyc,zz)
     zpyci = np.nanargmin(np.abs(np.abs(zz)-abs(zpyc)))
     #gprime = (localdens[zpyci-10] - localdens[zpyci+10])/(zz[zpyci-10] - zz[zpyci+10])
-    print(4)
     gprime = 9.8*(np.mean(localdens[zpyci:glibi])-np.mean(localdens[:zpyci]))/np.mean(localdens[:glibi])
-    print(5)
     ax1.scatter(gprime*shelf_width,data["gprime"],c=color,marker=marker)
-    print(lightdens)
     #print(gprime)
     ax4.scatter((glibxval)*ices*(deltaH)*gprime,-data["shiflx"],c=color,marker=marker)
     #ax4.scatter((glibxval)*tcline_height*ices,-data["shiflx"],c=color,marker=marker)
@@ -281,12 +269,447 @@ def FStheory(fname,xval):
     for k in data.keys():
         if k != "ts":
             try:
-                data[k] = np.nanmean(data[k][data["ts"]>2])
+                data[k] = np.nanmean(data[k][data["ts"]>2.5])
             except:
                 data[k]=np.nan
     if "gprime" not in data.keys():
         data["gprime"] = np.nan
 
+    variables = grabMatVars(fname,("Hshelf","Xeast","Xwest","randtopog_height","Yicefront","Zcdw_pt_South","Zcdw_pt_shelf","tEast","sEast","icedraft","zz","h","yy","xx"))
+    icedraft = np.asarray(variables["icedraft"])
+    h = np.asarray(variables["h"])
+    #
+    tNorth = np.asarray(variables["tEast"])[-1,:]
+    sNorth = np.asarray(variables["sEast"])[-1,:]
+    rho0 = dens(sNorth,tNorth,500)
+    zgl = np.nanmin(icedraft)
+
+    shelf_width = float(variables["Xeast"])-float(variables["Xwest"])
+    aisfxval = intTemp(aisf,fname)
+    glibxval = intTemp(glib,fname)
+    ices,beds = slope(aisf,fname)
+    ices = volume(fname)
+    max_height = variables["Zcdw_pt_shelf"][0][0]
+    tcline_height = (max_height-75)/2.0+75
+    localdens = dens(sNorth,tNorth,abs(0))
+    zz = np.asarray(variables["zz"])[0]
+    #zpyci = np.argmax(np.abs(np.diff(localdens)/np.diff(zz)))
+    gradd = np.abs(np.diff(localdens)/np.diff(zz))
+    
+    tcline_height=np.mean(zz[:-1][gradd>np.quantile(gradd,0.8)])#+75
+    zpyci = np.argmin(np.abs(np.abs(zz)-abs(tcline_height)))
+    #plt.plot(localdens,zz)
+    #plt.axhline(y=tcline_height)
+    #plt.axhline(y=(max_height-75)/2.0+75,color="red")
+    #plt.show()
+    #gprime_ext = 9.8*(np.mean(localdens[zpyci:])-np.mean(localdens[:min(zpyci*2,len(localdens)-1)]))/np.mean(localdens)
+    #gprime_ext = 9.8*(np.mean(localdens[zpyci:min(zpyci*2,len(localdens)-1)])-np.mean(localdens[:zpyci]))/np.mean(localdens[:min(zpyci*2,len(localdens)-1)])
+    d = localdens
+    if np.sum(d-d[0]>0.03)>0:#and np.sum(t>0.5)>0:
+        mldi = np.where(d-d[0]>0.03)[0][0]
+
+        #cdwi = np.where(t>0)[0][0]
+        rho_1 = np.nanmean(d[:mldi])
+        rho_2 = np.nanmean(d[mldi:min(mldi*2,len(d)-1)])
+        gprime_ext = 9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2))
+    #gprime_ext = 9.8*(np.mean(localdens[zpyci:min(zpyci+10,len(localdens)-1)])-np.mean(localdens[max(0,zpyci-10):zpyci]))/np.mean(localdens[:min(zpyci*2,len(localdens)-1)])
+    rho_1i = np.logical_and(zz<zz[zpyci],zz>zz[zpyci]-25)
+    rho_2i = np.logical_and(zz<zz[zpyci]+25,zz>zz[zpyci])
+    gprime_ext = 9.8*(np.mean(localdens[rho_1i])-np.mean(localdens[rho_2i]))/np.mean(localdens[np.logical_or(rho_1i,rho_2i)])
+
+    deltaH = -(abs(tcline_height)- abs(glib))
+    f = 1.3*10**-4
+    rho0 = 1025
+    rhoi = 910
+    Cp = 4186
+    If = 334000
+
+    #return glibxval*deltaH*gprime_ext/f*ices,-data["shiflx"]
+    #return glibxval*deltaH*(gprime_ext/625000)/f*ices,-data["shiflx"]
+    #return (glibxval)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365)
+    return (glibxval)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365)
+    #return (glibxval)*glibxval*ices,-data["shiflx"]/(60*60*24*365)
+
+def depthFromdZ(ds):
+    U = ds.UVEL.values[0,:,:,:]
+    fZ = list(ds.Z)
+    DZ = np.asarray(fZ)
+    Z = np.repeat(DZ,U.shape[1]*U.shape[2])
+    Z = Z.reshape(U.shape[0],U.shape[1],U.shape[2])
+    z = np.concatenate((ds.hFacC.values[:-1,:,:]-ds.hFacC.values[1:,:,:],ds.hFacC[-1:,:,:]),axis=0)
+    z[z<0]=0
+    z[-1,:,:]=0
+    zmask = z
+    return np.sum(zmask*Z,axis=0)
+def barotropic_streamfunction_max(fname,times=np.array([]),res=1):
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    shortname, fpath = outPath(fname) 
+    depth = depthFromdZ(ds)
+    UFULL = ds.UVEL.values
+    VFULL = ds.VVEL.values
+    bts = []
+    for k in tqdm(range(0,ds.UVEL.values.shape[0],res)):
+        U = UFULL[k,:,:,:]
+        V = VFULL[k,:,:,:]
+        fDZ = list(np.diff(ds.Z))
+        fDZ.append(fDZ[-1])
+        fDZ = np.asarray(fDZ)
+        DZ = np.repeat(fDZ,U.shape[1]*U.shape[2])
+        DZ = DZ.reshape(U.shape[0],U.shape[1],U.shape[2])
+        UU = np.sum(U*DZ*ds.hFacW.values,axis=0)
+        xs = ds.XC.values
+        ys = list(np.diff(ds.YC.values))
+        ys.append(ys[-1])
+        ys = np.repeat(ys,U.shape[2])
+
+        ys = ys.reshape(U.shape[1],U.shape[2],order="F")
+        bt = np.cumsum(UU*ys,axis=0)
+        bt[np.sum(ds.hFacC,axis=0)==0] = np.nan
+        bts.append(np.nanmax(bt))
+    return bts
+
+
+def meltmapmovie(fname,description,times=np.array([])):
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    shortname, fpath = outPath(fname) 
+    moviewriter = FFMpegFileWriter(fps=1)
+    fig,ax1 = plt.subplots()
+    mask = np.logical_and(ds.hFacC.values[0]==0,np.sum(ds.hFacC.values,axis=0)!=0)
+    theta = ds.THETA.values
+    with moviewriter.saving(fig, fpath+"-meltmap.mp4" , dpi=100):
+        for k in tqdm(range(int(ds.UVEL.values.shape[0]))):
+            thetak = theta[k]
+            thetaavg = np.nanmean(thetak,axis=0)
+            melt= ds.SHIfwFlx.values[k]
+            melt[~mask]=np.nan
+            thetaavg[~mask]=np.nan
+            frame = ax1.pcolormesh(-melt,cmap="jet",vmax=0.0012)
+            if k==0:
+                cb = plt.colorbar(frame)
+            moviewriter.grab_frame()
+            #cb.remove()
+            frame.remove()
+
+def mixmap(fname,description,times=np.array([])):
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    shortname, fpath = outPath(fname) 
+    moviewriter = FFMpegFileWriter(fps=1)
+    fig,ax1 = plt.subplots()
+
+    mask = np.logical_and(ds.hFacC.values[0]==0,np.sum(ds.hFacC.values,axis=0)!=0)
+    theta = ds.THETA.values
+    with moviewriter.saving(fig, fpath+"-mixmap.mp4" , dpi=100):
+        for k in tqdm(range(int(ds.UVEL.values.shape[0]))):
+            thetak = theta[k]
+            thetaavg = np.nanmean(thetak,axis=0)
+            melt= ds.MXLDEPTH.values[k]
+            melt[~mask]=np.nan
+            thetaavg[~mask]=np.nan
+            frame = ax1.pcolormesh(melt,cmap="jet")
+            if k==0:
+                cb = plt.colorbar(frame)
+            moviewriter.grab_frame()
+            #cb.remove()
+            frame.remove()
+
+
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    inputname = "/".join(fname.split("/")[:-1])
+    bmask = bottomMask(inputname,ds)
+    icem = icemask(inputname,ds)
+    shortname, fpath = outPath(fname) 
+    fig,ax1 = plt.subplots(1,1)
+    theta = ds.THETA.values
+    X = ds.XC.values
+    Y = ds.YC.values
+    thetatop = np.full_like(theta[1,1],0)
+    count=0
+    for k in tqdm(range(int(theta.shape[0]))):
+        if times[k]>5:
+            count+=1
+            thetak = theta[k]
+            thetatopc = thetak *icem
+            thetatopc[~icem]=np.nan
+            #thetatopc=thetak[0]
+            if np.sum(~np.isnan(thetatopc)) !=0:
+                thetatop += np.nanmean(thetatopc,axis=0)
+    thetatop = thetatop/count
+    mask = np.logical_and(ds.hFacC.values[0]==0,np.sum(ds.hFacC.values,axis=0)!=0)
+    thetatop[~mask]=np.nan
+    
+    cax = ax1.pcolormesh(X/1000,Y/1000,thetatop,cmap=cmocean.cm.thermal,vmin=-0.8,vmax=0.2)
+    cb = plt.colorbar(cax,ax=ax1,pad=0.05)
+
+    plt.xlabel("x (km)",fontsize=18)
+    plt.ylabel("y (km)",fontsize=18)
+    plt.xlim(50,350)
+    plt.ylim(0,150)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+
+    #ax1.set_title("Width: 100",fontsize=18)
+    plt.tight_layout
+    plt.show()
+
+
+def bottomVtop(fname,description,times=np.array([])):
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,prefix=["SALT","THETA","UVEL","VVEL","WVEL"],ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    inputname = "/".join(fname.split("/")[:-1])
+    bmask = bottomMask(inputname,ds)
+    icem = icemask(inputname,ds)
+    shortname, fpath = outPath(fname) 
+    fig,(ax1,ax2) = plt.subplots(1,2)
+    theta = ds.THETA.values
+    salt = ds.SALT.values
+    uvel = ds.UVEL.values
+    vvel = ds.WVEL.values
+    X,Y = np.meshgrid(range(uvel.shape[3]),range(uvel.shape[2]))
+    thetabot,saltbot,ubot,vbot = np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0)
+    thetatop,salttop,utop,vtop = np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0)
+    count=0
+    for k in tqdm(range(int(ds.UVEL.values.shape[0]))):
+        if times[k]>5:
+            count+=1
+            thetak = theta[k]
+            thetabotc = thetak *bmask
+            thetabotc[~bmask] = np.nan
+            thetabot += np.nanmean(thetabotc,axis=0)
+
+            saltk = salt[k]
+            saltbotc = saltk *bmask
+            saltbotc[~bmask] = np.nan
+            #plt.imshow(saltbotc[:,:,90])
+            #plt.show()
+            #plt.imshow(ds.hFacC[:,:,90])
+            #plt.show()
+            saltbot += np.nanmean(saltbotc,axis=0)
+
+            ubot += np.nanmean(uvel[k] * bmask,axis=0)
+            vbot +=  np.nanmean(vvel[k] * bmask,axis=0)
+            thetatopc = thetak *icem
+            thetatopc[~bmask] = np.nan
+            thetatop += np.nanmean(thetatopc,axis=0)
+            utop +=  np.nanmean(uvel[k] * icem,axis=0)
+            vtop +=  np.nanmean(vvel[k] * icem,axis=0)
+    thetabot = thetabot/count
+    thetatop = thetatop/count
+    saltbot = saltbot/count
+    cax = ax1.pcolormesh(X,Y,thetabot,vmin=-2,vmax=1,cmap=cmocean.cm.thermal)
+    plt.colorbar(cax,ax=ax1)
+
+
+    cax = ax2.pcolormesh(X,Y,vbot,vmin=-0.0001,vmax=0.0001,cmap="jet")
+    #cax = ax2.pcolormesh(X,Y,saltbot,vmin=33.6,vmax=34.6,cmap=cmocean.cm.haline)
+    plt.colorbar(cax,ax=ax2)
+    
+    ax1.set_title("Bottom temp")
+    ax2.set_title("Bottom V")
+
+    if k==1:
+        cb = plt.colorbar(frame,ax=ax2,pad=0.05)
+
+    plt.show()
+
+def bottomspinup(fname,description,times=np.array([])):
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,prefix=["SALT","THETA","UVEL","VVEL","WVEL","RHOAnoma"],ignore_unknown_vars=True,extra_variables = extra_variables)
+    inputname = "/".join(fname.split("/")[:-1])
+    bmask = bottomMask(inputname,ds)
+    icem = icemask(inputname,ds)
+    shortname, fpath = outPath(fname) 
+    theta = ds.THETA.values
+    salt = ds.SALT.values
+    uvel = ds.UVEL.values
+    vvel = ds.WVEL.values
+    X,Y = np.meshgrid(range(uvel.shape[3]),range(uvel.shape[2]))
+    thetabot,saltbot,ubot,vbot = np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0)
+    thetatop,salttop,utop,vtop = np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0)
+    count=0
+    for k in tqdm(range(10)):
+        fig,(ax1,ax2) = plt.subplots(1,2)
+        thetak = theta[k]
+        thetak[~bmask]=np.nan
+        thetabot = np.nanmean(thetak,axis=0)
+        saltk = salt[k]
+        saltk[~bmask]=np.nan
+        saltbot = np.nanmean(saltk,axis=0)
+        uvelk = uvel[k]
+        uvelk[ds.hFacC==0]=np.nan
+        ubot = np.nansum(uvelk,axis=0)
+        vvelk = vvel[k]
+        vvelk[ds.hFacC==0]=np.nan
+        vbot = np.nansum(np.abs(vvelk),axis=0)
+        cax = ax1.pcolormesh(X,Y,thetabot,vmin=-1,vmax=1,cmap=cmocean.cm.thermal)
+        plt.colorbar(cax,ax=ax1)
+        cax = ax2.pcolormesh(X,Y,dens(saltbot,thetabot,400),cmap=cmocean.cm.haline,vmin=1029.50,vmax=1029.75)
+        #cax = ax2.pcolormesh(X,Y,vbot,cmap=cmocean.cm.haline,vmin=-0.005,vmax=0.005)
+        plt.colorbar(cax,ax=ax2)
+        fig.canvas.manager.full_screen_toggle() # toggle fullscreen mode
+        plt.show()
+
+
+    ax1.set_title("Bottom temp")
+    ax2.set_title("Bottom V")
+
+    if k==1:
+        cb = plt.colorbar(frame,ax=ax2,pad=0.05)
+
+    plt.show()
+
+
+def someotherfunc():
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    bmask = bottomMask(fname,ds)
+    icem = icemask(fname,ds)
+    shortname, fpath = outPath(fname) 
+    fig,((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
+    theta = ds.THETA.values
+    uvel = ds.UVEL.values
+    vvel = ds.VVEL.values
+    wvel = ds.WVEL.values
+    mask = np.full_like(uvel[0,0],1,dtype=bool)
+    mask[::4,::4] = 0
+    shifwflx = ds.SHIfwFlx.values
+
+    X,Y = np.meshgrid(range(uvel.shape[2]),range(uvel.shape[3]))
+
+    for k in tqdm(range(int(ds.UVEL.values.shape[0]))):
+        thetak = theta[k]
+        thetabot = thetak *bmask
+        thetabot[~bmask] = np.nan
+        thetabot = np.nanmean(thetabot,axis=0)
+        utop =  np.nanmean(uvel[k] * icem,axis=0)
+        vtop =  np.nanmean(vvel[k] * icem,axis=0)
+        wtop =  np.nanmean(wvel[k] * icem,axis=0)
+        frame = ax1.pcolormesh(utop)
+        if k==1:
+            cb = plt.colorbar(frame,ax=ax1,pad=0.1)
+        #ax1.quiver(ubot,vbot,scale=1.5)
+
+        thetatop = thetak *icem
+        thetatop[~icem] = np.nan
+        thetatop = np.nanmean(thetatop,axis=0)+1.8
+        frame = ax2.pcolormesh(thetatop)
+        if k==1:
+            cb = plt.colorbar(frame,ax=ax2,pad=0.1)
+
+        ax3.pcolormesh((thetatop**1)*np.sqrt(utop**2+vtop**2+wtop**2))
+        ax4.pcolormesh(-shifwflx[k])
+        plt.show()
+        
+    vals = grabMatVars(fname,("h","icedraft"))
+    h = np.abs(np.asarray(vals["h"]))
+    Znew = np.zeros(ds.THETA.shape[1:])
+    for l in range(Znew.shape[0]):
+        Znew[l,:,:]=ds.Z.values[l]
+    bottom_dist = Znew-(-h.T)
+    return np.logical_and(bottom_dist < 50,bottom_dist>0)
+
+
+    
+def outPath(resultspath):
+    nameparts = resultspath.split("/")
+    shortname = nameparts[-3] + "|" + nameparts[-2]
+    fpath = "/".join((nameparts[:-5]+["pics"] + [shortname]))
+    return shortname, fpath
+
+def crossAndMelt(fname,name=""):
+    fig,(ax1,ax2) = plt.subplots(1,2,figsize=(15,6))
+    plt.subplots_adjust(wspace=0.45)
+    crossSectionAverage(fname,"Reference",quant="THETA",dim="zonal",ax1=ax1,show=False)
+    meltMapAverage(fname,"",ax1=ax2)
+
+    plt.savefig("/home/garrett/Projects/HUB/paperfigures/crossAndMelts/"+name+".png")
+    plt.close()
+
+
+
+def generateRunsTable(runsdict):
+    table = []
+    prettynames = {'shelf_depth':"Nominal depth of shelf", \
+            'rng_seed':"Random bathymetry seed used", 'random_amplitude':"Amplitude of random bathymetry",\
+            'cavity_depth':"Depth of cavity relative to depth of shelf", 'cavity_width': "Width of cavity",\
+            'yicefront':"Northward extent of ice shelf"}#, 'tcline_atshelf_depth': "Depth of temperature maximum"}
+    for k in runsdict.keys():
+        for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
+            for l in range(len(runsdict[k]["specialstring"])):
+                key=runsdict[k]["specialstring"][l]
+                fname = f+"/" #+"results/"
+                variables = grabMatVars(fname,("experiment_parameters"))
+                fields = variables["experiment_parameters"][0][0].__dict__
+                conversion={"d0":"cavityd0","d-200":"cavityd-200","slope200":"cavityd200","slope375":"cavityd375"}
+                d={}
+                if not runsdict[k]["specialstring"][0]:
+                    ss = k.split("-")[0]
+                else:
+                    ss = runsdict[k]["specialstring"][l]
+                if ss in conversion.keys():
+                    ss = conversion[ss]
+                d["Experiment Name"] = ss
+                for j in fields.keys():
+                    if j in prettynames.keys():
+                        d[prettynames[j]] = fields[j][0][0]
+                if "Northward extent of ice shelf" not in d:
+                    d["Northward extent of ice shelf"]=150
+                if d not in table:
+                    table.append(d)
+    for k in table:print(k.keys())
+    print(tabulate(table,headers="keys",tablefmt="latex",maxcolwidths=[9]*len(table[0].keys())))
+    return table
+        
+def legendFunction(runsdict):
+    conversion={"d0":"cavityd0","d-200":"cavityd-200","slope200":"cavityd200","slope375":"cavityd375"}
+    for k in runsdict.keys():
+        for l in range(len(runsdict[k]["specialstring"])):
+            if not runsdict[k]["specialstring"][0]:
+                ss = k.split("-")[0]
+            else:
+                ss = runsdict[k]["specialstring"][l]
+            if ss in conversion.keys():
+                ss = conversion[ss]
+            plt.scatter(1,1,marker=runsdict[k]["marker"][l],color=runsdict[k]["color"][l],label=ss)
+    plt.legend()
+    plt.show()
+            
+
+def gprimeWidth(fname,xval,fig,ax1,title="",color="blue",marker="o"):
+    #if "width" not in fname:# or 'at125' not in fname:
+        #return 0
+    data = timeSeries(fname)
+    for k in data.keys():
+        if k != "ts":
+            try:
+                data[k] = np.nanmean(data[k][data["ts"]>2])
+            except:
+                data[k]=np.nan
+    if "gprime" not in data.keys():
+        data["gprime"] = np.nan
+    print(data["gprime"])
+    variables = grabMatVars(fname,("Xeast","Xwest","Yicefront"))
+    yice = float(variables["Yicefront"])
+    shelf_width = float(variables["Xeast"])-float(variables["Xwest"])
+    shiflx = -data["shiflx"]
+    xval,shiflx = FStheory(fname,xval)
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    inputname = "/".join(fname.split("/")[:-1])
+    icem = icemask(fname,ds)
     variables = grabMatVars(fname,("Hshelf","Xeast","Xwest","randtopog_height","Yicefront","Zcdw_pt_South","tEast","sEast","icedraft","zz","h","yy","xx"))
     icedraft = np.asarray(variables["icedraft"])
     h = np.asarray(variables["h"])
@@ -296,26 +719,212 @@ def FStheory(fname,xval):
     rho0 = dens(sNorth,tNorth,0)
     zgl = np.nanmin(icedraft)
 
-    aisfxval = intTemp(aisf,fname)
-    glibxval = intTemp(glib,fname)
-    ices,beds = slope(aisf,fname)
-    ices = volume(fname)
     max_height = variables["Zcdw_pt_South"][0][0]
     tcline_height = (max_height-75)/2.0+75
-    localdens = dens(sNorth,tNorth,abs(0))
+    localdens = dens(sNorth,tNorth,abs(200))
+    d = localdens
+    Zfull = np.asarray(list(ds.Z))
+    if np.sum(abs(tNorth-tNorth[0])>0.2)>0:#and np.sum(t>0.5)>0:
+        t = tNorth[sNorth>0.1]
+        Z = Zfull[sNorth>0.1]
+        s = sNorth[sNorth>0.1]
+        mldi = np.where(abs(tNorth-tNorth[0])>0.2)[0][0]
+        d = dens(sNorth,tNorth,Z[mldi])
+        #cdwi = np.where(t>0)[0][0]
+        rho_1 = np.nanmean(d[:mldi])
+        rho_2 = np.nanmean(d[mldi:min(mldi*2,len(d)-1)])
+        #gprime_ext = np.nanmax(np.abs(np.diff(d)/np.diff(Z)))
+        gprime_ext = 9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2))
+
+    #if np.sum(d-d[0]>0.03)>0:#and np.sum(t>0.5)>0:
+        #mldi = np.where(d-d[0]>0.03)[0][0]
+
+        #cdwi = np.where(t>0)[0][0]
+        #rho_1 = np.nanmean(d[:mldi])
+        #rho_2 = np.nanmean(d[mldi:min(mldi*5,len(d)-1)])
+        #gprime_ext = 9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2))
     zz = np.asarray(variables["zz"])[0]
-    zpyci = np.argmin(np.abs(np.abs(zz)-abs(tcline_height)))
-    gprime_ext = 9.8*(np.mean(localdens[zpyci:])-np.mean(localdens[:zpyci]))/np.mean(localdens)
-    deltaH = -(abs(tcline_height)- abs(glib))
+    zpyci = np.argmin(np.abs(np.abs(zz)-abs(max_height)))
+    #gprime_ext = 9.8*(np.mean(localdens[zpyci:min(zpyci*2,len(localdens)-1)])-np.mean(localdens[:zpyci]))/np.mean(localdens[:min(zpyci*2,len(localdens)-1)])
     f = 1.3*10**-4
-    return glibxval*deltaH*gprime_ext/f*ices,-data["shiflx"]
+    #ax1.scatter(gprime_ext*shelf_width,float(data["gprime"])*840,marker=marker,c=color)
+    #ax1.scatter(gprime_ext*shelf_width,float(data["gprime"])*625000-525,marker=marker,c=color)
+    #ax1.scatter(gprime_ext*shelf_width,float(data["gprime"]),marker=marker,c=color)
+    ax1.scatter(gprime_ext*shelf_width,float(data["gprime"]),marker=marker,c=color)
+    #plt.xlabel(r'$g^{\prime}_{ext}* W (m^2/s^2)$',fontsize=18)
+    plt.xlabel(r'$g^{\prime}_{ext} (m/s^2)$',fontsize=18)
+    plt.ylabel(r'$g^{\prime}_{in} (m/s^2)$',fontsize=18)
+    #ax1.scatter(shelf_width,float(data["gprime"]),marker=marker,c=color)
+    #ax1.scatter(shelf_width,gprime_ext,marker=marker,c=color)
+    #ax1.plot(localdens,zz)
+    #ax1.axhline(zz[zpyci])
+    return gprime_ext
+
+def gprimeAll(fname,xval,fig,ax1,title="",color="blue",marker="o"):
+    data = timeSeries(fname)
+    for k in data.keys():
+        if k != "ts":
+            try:
+                data[k] = np.nanmean(data[k][data["ts"]>2])
+            except:
+                data[k]=np.nan
+    if "gprime" not in data.keys():
+        data["gprime"] = np.nan
+    variables = grabMatVars(fname,("Xeast","Xwest","Yicefront"))
+    yice = float(variables["Yicefront"])
+    shelf_width = float(variables["Xeast"])-float(variables["Xwest"])
+    shiflx = -data["shiflx"]
+    xval,shiflx = FStheory(fname,xval)
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    extra_variables["KPPdiffT"] = dict(dims=["k","j","i"], attrs=dict(standard_name="KPP mld", units="m"))
+
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    inputname = "/".join(fname.split("/")[:-1])
+    icem = icemask(fname,ds)
+    variables = grabMatVars(fname,("Hshelf","Xeast","Xwest","randtopog_height","Yicefront","Zcdw_pt_South","tEast","sEast","icedraft","zz","h","yy","xx"))
+    icedraft = np.asarray(variables["icedraft"])
+    h = np.asarray(variables["h"])
+    #
+    tNorth = np.asarray(variables["tEast"])[-1,:]
+    sNorth = np.asarray(variables["sEast"])[-1,:]
+    rho0 = dens(sNorth,tNorth,0)
+    zgl = np.nanmin(icedraft)
+
+    max_height = variables["Zcdw_pt_South"][0][0]
+    tcline_height = (max_height-75)/2.0+75
+    localdens = dens(sNorth,tNorth,abs(tcline_height))
+    d = localdens
+    Z = np.asarray(list(ds.Z))
+    zz = np.asarray(variables["zz"])[0]
+    if np.sum(abs(tNorth-tNorth[0])>0.2)>0:#and np.sum(t>0.5)>0:
+        mldi = np.where(abs(tNorth-tNorth[0])>0.2)[0][0]
+        #cdwi = np.where(t>0)[0][0]
+        rho_1 = np.nanmean(d[:mldi])
+        rho_2 = np.nanmean(d[mldi:min(mldi*2,len(d)-1)])
+        #gprime_ext = np.nanmean(np.abs(np.diff(d)/np.diff(zz)))
+        gprime_ext = 9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2))
+
+    zz = np.asarray(variables["zz"])[0]
+    zpyci = np.argmin(np.abs(np.abs(zz)-abs(max_height)))
+    gprime_ext = 9.8*(np.mean(localdens[zpyci:min(zpyci*2,len(localdens)-1)])-np.mean(localdens[:zpyci]))/np.mean(localdens[:min(zpyci*2,len(localdens)-1)])
+    f = 1.3*10**-4
+    #ax1.scatter(gprime_ext*shelf_width,float(data["gprime"])*840,marker=marker,c=color)
+    #ax1.scatter(gprime_ext*shelf_width,float(data["gprime"])*625000-525,marker=marker,c=color)
+    #ax1.scatter(gprime_ext*shelf_width,float(data["gprime"]),marker=marker,c=color)
+    W0 = gprime_ext*shelf_width/float(data["gprime"])
+    kpp = np.nanmean(ds.KPPdiffT.values,axis=0)
+    kpp = np.nanmean(kpp,axis=0)
+    kpp = np.nanmean(kpp[ds.YC.values<60000])
+    small=np.log10(np.abs(ds.THETA_inst.values[1]))<-3
+    smallmask=np.logical_and(small,ds.hFacC!=0)
+    smallmask = np.sum(smallmask,axis=0)
+    #plt.imshow(np.sum(smallmask,axis=0))
+    #plt.title(fname)
+    #plt.show()
+    #XX,YY = np.meshgrid(ds.XC.values,ds.YC.values)
+    #print("exact zeros",np.sum(np.log10(np.abs(ds.THETA.values[ds.hFacC!=0]))<-3))
+    #print("exact zeros",np.sum(np.log10(np.abs(ds.THETA.values[ds.hFacC!=0]))<-3))
+    #print("exact zeros",np.sum(np.log10(np.abs(ds.THETA.values[ds.hFacC!=0]))<-3))
+    ax1.scatter(float(data["gprime"]),np.sum(smallmask[YY<60000]),marker=marker,c=color)
+    #ax1.scatter(float(data["gprime"]),-float(data["shiflx"]),marker=marker,c=color)
+    #plt.xlabel(r'$g^{\prime}_{in} (m/s^2)$',fontsize=18)
+    #plt.ylabel(r'$m (m/yr)$',fontsize=18)
+    #plt.xlabel(r'$g^{\prime}_{ext}* W (m^2/s^2)$',fontsize=18)
+    plt.xlabel(r'$g^{\prime}_{ext} (m/s^2)$',fontsize=18)
+    plt.ylabel(r'$g^{\prime}_{in} (m/s^2)$',fontsize=18)
+    #ax1.scatter(shelf_width,float(data["gprime"]),marker=marker,c=color)
+    #ax1.scatter(shelf_width,gprime_ext,marker=marker,c=color)
+    #ax1.plot(localdens,zz)
+    #ax1.axhline(zz[zpyci])
+    return gprime_ext
+
+def saltBudget(fname,xval,fig,ax1,title="",color="blue",marker="o"):
+    data = timeSeries(fname)
+    if "tcdw" not in data:
+        return 0
+    for k in data.keys():
+        if k != "ts":
+            try:
+                data[k] = np.nanmean(data[k][data["ts"]>2])
+            except:
+                data[k]=np.nan
+    if "gprime" not in data.keys():
+        data["gprime"] = np.nan
+    variables = grabMatVars(fname,("Xeast","Xwest","Yicefront"))
+    yice = float(variables["Yicefront"])
+    shelf_width = float(variables["Xeast"])-float(variables["Xwest"])
+    shiflx = -data["shiflx"]
+    xval,shiflx = FStheory(fname,xval)
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    minvel = (ds.UVEL*(ds.THETA+1.8)).mean(dim="time",skipna=True).min(dim="XG").min(dim="XC").min(dim="Z")#.argmin(dim="YC")
+    ht = ds.UVEL.values*(ds.THETA.values+1.8)
+    ht = np.nanmean(ht,axis=0)
+    ht = np.nanmin(ht,axis=0)
+    ht = np.mean(ht,axis=1)
+    minvel=ht
+
+    inputname = "/".join(fname.split("/")[:-1])
+    icem = icemask(fname,ds)
+    variables = grabMatVars(fname,("Hshelf","Xeast","Xwest","randtopog_height","Yicefront","Zcdw_pt_South","tEast","sEast","icedraft","zz","h","yy","xx"))
+    icedraft = np.asarray(variables["icedraft"])
+    h = np.asarray(variables["h"])
+    meltline = ds.SHIfwFlx.mean(dim="time").mean(dim="XC").values
+    meltline = minvel
+    weighted = np.sum(meltline*np.asarray(range(len(meltline))))/np.sum(range(len(meltline)))
+    #iceline = np.mean(icedraft,axis=0)
+    #print("velmin: ",ds.UVEL.mean(dim="time",skipna=True).min(dim="XG").min(dim="Z").argmin(dim="YC").values)
+    #plt.plot(iceline)
+    #ax2 = plt.gca().twinx()
+    #plt.title(fname)
+    #ax2.plot(meltline)
+    #plt.show()
+    #print(minvel)
+    #
+    tNorth = np.asarray(variables["tEast"])[-1,:]
+    sNorth = np.asarray(variables["sEast"])[-1,:]
+    rho0 = dens(sNorth,tNorth,0)
+    zgl = np.nanmin(icedraft)
+
+    max_height = variables["Zcdw_pt_South"][0][0]
+    tcline_height = (max_height-75)/2.0+75
+    localdens = dens(sNorth,tNorth,abs(tcline_height))
+    d = localdens
+    Z = np.asarray(list(ds.Z))
+    zz = np.asarray(variables["zz"])[0]
+    if np.sum(abs(tNorth-tNorth[0])>0.2)>0:#and np.sum(t>0.5)>0:
+        mldi = np.where(abs(tNorth-tNorth[0])>0.2)[0][0]
+        #cdwi = np.where(t>0)[0][0]
+        rho_1 = np.nanmean(d[:mldi])
+        rho_2 = np.nanmean(d[mldi:min(mldi*2,len(d)-1)])
+        #gprime_ext = np.nanmean(np.abs(np.diff(d)/np.diff(zz)))
+        gprime_ext = 9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2))
+
+    zz = np.asarray(variables["zz"])[0]
+    zpyci = np.argmin(np.abs(np.abs(zz)-abs(max_height)))
+    gprime_ext = 9.8*(np.mean(localdens[zpyci:min(zpyci*2,len(localdens)-1)])-np.mean(localdens[:zpyci]))/np.mean(localdens[:min(zpyci*2,len(localdens)-1)])
+    f = 1.3*10**-4
+    shelf_width = float(variables["Xeast"])-float(variables["Xwest"])
+    #ax1.scatter(float(data["scdw"]-data["ssurf"])/float(data["tcdw"]-data["tsurf"]),data["froude"],marker=marker,c=color)
+    ax1.scatter(shelf_width,float(data["tcdw"]-data["tsurf"])**2,marker=marker,c=color)
+    #print(sNorth)
+    #ax1.scatter(float(data["scdw"]-data["ssurf"])/float(data["tcdw"]-data["tsurf"]),np.std(sNorth),marker=marker,c=color)
+    plt.xlabel(r'Width (m)',fontsize=18)
+    plt.ylabel(r'$(T_{cdw} - T_{surf})^2$',fontsize=18)
+    return gprime_ext
+
+
+
 
 def steadyStateAverageSimple(fname,xval,fig,ax1,title="",color="blue",marker="o"):
     data = timeSeries(fname)
     for k in data.keys():
         if k != "ts":
             try:
-                data[k] = np.nanmean(data[k][data["ts"]>2])
+                data[k] = np.nanmean(data[k][data["ts"]>5])
             except:
                 data[k]=np.nan
     if "gprime" not in data.keys():
@@ -346,7 +955,6 @@ def steadyStateHT(fname,xval,fig,ax1,title="",color="blue",marker="o"):
     shelf_width = float(variables["Xeast"])-float(variables["Xwest"])
     shiflx = -data["shiflx"]
     xval,shiflx = FStheory(fname,xval)
-    print(yice,shelf_width,yice*shelf_width)
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
 
     times=getIterNums(fname)
@@ -362,8 +970,12 @@ def timeSeriesDashboard(fname,label,fig,axises,times=np.array([]),color="yellow"
     ((ax1,ax2,ax5),(ax3,ax4,ax6)) = axises 
     data = timeSeries(fname)
     starttime = 0
+    if len(data["ts"])==0:
+        print(fname, "EMPTY")
+        return 
     if np.nanmax(data["ts"][~np.isnan(data["theta"])])<9:
         print(fname,np.nanmax(data["ts"][~np.isnan(data["theta"])]))
+
 
     ax1.plot(data["ts"][data["ts"]>starttime],data["theta"][data["ts"]>starttime],label=label)
     ax1.set_xlabel("Time")
@@ -391,13 +1003,6 @@ def timeSeriesDashboard(fname,label,fig,axises,times=np.array([]),color="yellow"
     bottomtemps = []
     surfacetemps = []
 
-    #ax5.plot(data["ts"][data["ts"]>starttime],data["bottemp"][data["ts"]>starttime],label=label + " bottom",c=color)
-    #ax6.plot(data["ts"][data["ts"]>starttime],data["surfacetemp"][data["ts"]>starttime],label=label + " surface",c=color)
-    #ax5.set_xlabel("Time")
-    #ax5.set_ylabel("Bottom Potential Temperature")
-    #ax6.set_xlabel("Time")
-    #ax6.set_ylabel("Surface Potential Temperature")
-
 def depthFromdZ(ds):
     U = ds.UVEL.values[0,:,:,:]
     fZ = list(ds.Z)
@@ -418,45 +1023,48 @@ def grabDeltaT(fname):
             s = str(line)
             if "deltaT" in s:
                 result = re.search('=(.*),', s)
-                return float(result.group(1))
+                result = result.group(1)
+                if result == "0.25000+02":
+                    result = "0.25000e+02"
+                return float(result)
+
 def barotropic_streamfunction_graph(fname,description,times=np.array([]),res=1):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
-    times=getIterNums(fname)
-    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    #times=getIterNums(fname)
+    #ds = open_mdsdataset(fname,prefix=["UVEL","VVEL"],ignore_unknown_vars=True)#,iters=times)
+    ds = open_mdsdataset(fname,prefix=["SALT","THETA","UVEL","VVEL","WVEL"],ignore_unknown_vars=True,extra_variables = extra_variables)
     shortname, fpath = outPath(fname) 
-    moviewriter = FFMpegFileWriter(fps=1)
-    fig,ax1 = plt.subplots()
     depth = depthFromdZ(ds)
     UFULL = ds.UVEL.values#
     VFULL = ds.VVEL.values
-    cavity_mask = (ds.SHIfwFlx[0].values !=0)
-    with moviewriter.saving(fig, fpath+"-bt.mp4" , dpi=250):
-        for k in tqdm(range(int(ds.UVEL.values.shape[0]*3/4),ds.UVEL.values.shape[0],res)):
-            U = UFULL[k,:,:,:]
-            V = VFULL[k,:,:,:]
-            fDZ = list(np.diff(ds.Z))
-            fDZ.append(fDZ[-1])
-            fDZ = np.asarray(fDZ)
-            DZ = np.repeat(fDZ,U.shape[1]*U.shape[2])
-            DZ = DZ.reshape(U.shape[0],U.shape[1],U.shape[2])
-            UU = np.sum(U*DZ*ds.hFacW.values,axis=0)
-            xs = ds.XC.values
-            ys = list(np.diff(ds.YC.values))
-            ys.append(ys[-1])
-            ys = np.repeat(ys,U.shape[2])
-            ys = ys.reshape(U.shape[1],U.shape[2],order="F")
-            bt = np.cumsum(UU*ys,axis=0)
-            bt[np.sum(ds.hFacC,axis=0)==0] = np.nan
-            m,s = np.nanmedian(bt[cavity_mask]),np.nanstd(bt[cavity_mask])
-            vmin,vmax = m-3*s,m+3*s
-            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,bt,vmin=vmin,vmax=vmax)
-            ax1.contour(ds.XC.values,ds.YC.values,depth,levels=20,colors="black",vmin=vmin,vmax=vmax)
-            #ax1.quiver(ds.XC.values,ds.YC.values,np.sum(U,axis=0),np.sum(V,axis=0))
-            plt.title(str(k))
-            cb = plt.colorbar(frame)
-            moviewriter.grab_frame()
-            cb.remove()
-            frame.remove()
+    #cavity_mask = (ds.SHIfwFlx[0].values !=0)
+    #for k in tqdm(range(int(ds.UVEL.values.shape[0]*3/4),ds.UVEL.values.shape[0],res)):
+    for k in tqdm(range(10)):
+        fig,ax1 = plt.subplots()
+        U = UFULL[k]
+        V = VFULL[k]
+        fDZ = list(np.diff(ds.Z))
+        fDZ.append(fDZ[-1])
+        fDZ = np.asarray(fDZ)
+        DZ = np.repeat(fDZ,U.shape[1]*U.shape[2])
+        DZ = DZ.reshape(U.shape[0],U.shape[1],U.shape[2])
+        UU = np.sum(U*DZ*ds.hFacW.values,axis=0)
+        xs = ds.XC.values
+        ys = list(np.diff(ds.YC.values))
+        ys.append(ys[-1])
+        ys = np.repeat(ys,U.shape[2])
+        ys = ys.reshape(U.shape[1],U.shape[2],order="F")
+        bt = np.cumsum(UU*ys,axis=0)
+        bt[np.sum(ds.hFacC,axis=0)==0] = np.nan
+        m,s = np.nanmedian(bt[ds.YC.values<60000]),np.nanstd(bt[ds.YC.values<60000])
+        #vmin,vmax = m-3*s,m+3*s
+        vmin,vmax=0,30000
+        frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,bt,vmin=vmin,vmax=vmax)
+        ax1.contour(ds.XC.values,ds.YC.values,bt,levels=60,colors="black",vmin=vmin,vmax=vmax)
+        ax1.quiver(ds.XC.values,ds.YC.values,np.sum(U,axis=0),np.sum(V,axis=0))
+        plt.title(str(k))
+        cb = plt.colorbar(frame)
+        plt.show()
 
 
 
@@ -499,12 +1107,19 @@ def circulationFigure(fname,description,times=np.array([])):
     zs = ds.Z.values
     xs = ds.XG.values
     ys = ds.YG.values
+    ts = np.asarray(times/60.0/60.0/24.0/365.0)
+    ts = ds.time.values*grabDeltaT(fname)/60.0/60.0/24.0/365.0
+    tsnew = np.full_like(ts,0,dtype=float)
+    tsnew[:] = ts
+    ts = tsnew
+    ts = ts/1000000000
+
     glib = GLIBfromFile(matVarsFile(fname))
 
-    uvel = np.mean(ds.UVEL.values[times>5],axis=0)
-    vvel = np.mean(ds.VVEL.values[times>5],axis=0)
+    uvel = np.mean(ds.UVEL.values[ts>5],axis=0)
+    vvel = np.mean(ds.VVEL.values[ts>5],axis=0)
 
-    theta= np.mean(ds.THETA.values[times>5],axis=0)
+    theta= np.mean(ds.THETA.values[ts>5],axis=0)
     hfac = ds.hFacC.values
     interfacez = np.zeros(theta.shape[1:])
 
@@ -538,7 +1153,7 @@ def circulationFigure(fname,description,times=np.array([])):
     plt.quiver(X[::5,::5],Y[::5,::5],interfaceu[::5,::5],interfacev[::5,::5],color="white")
 
     plt.gca().tick_params(labelsize=15)
-    plt.contour(xs,ys,bottomz[:,::-1],[glib],colors=["red"],linewidths=4)
+    plt.contour(xs,ys,bottomz[:,::-1],[glib-25],colors=["red"],linewidths=4)
     plt.ylabel(r'x (km)',fontsize=18)
     plt.xlabel(r'y (km)',fontsize=18)
     plt.tight_layout
@@ -550,7 +1165,6 @@ def meltmapmovie(fname,description,times=np.array([])):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-    print(ds)
     shortname, fpath = outPath(fname) 
     moviewriter = FFMpegFileWriter(fps=1)
     fig,ax1 = plt.subplots()
@@ -574,7 +1188,6 @@ def mixmap(fname,description,times=np.array([])):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-    print(ds)
     shortname, fpath = outPath(fname) 
     moviewriter = FFMpegFileWriter(fps=1)
     fig,ax1 = plt.subplots()
@@ -588,7 +1201,6 @@ def mixmap(fname,description,times=np.array([])):
             melt= ds.MXLDEPTH.values[k]
             melt[~mask]=np.nan
             thetaavg[~mask]=np.nan
-            print(np.nanmin(melt),np.nanmax(melt))
             frame = ax1.pcolormesh(melt,cmap="jet")
             if k==0:
                 cb = plt.colorbar(frame)
@@ -640,7 +1252,6 @@ def topMap(fname,description,times=np.array([])):
     plt.show()
 
 
-def bottomVtop(fname,description,times=np.array([])):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
 
     times=getIterNums(fname)
@@ -654,7 +1265,6 @@ def bottomVtop(fname,description,times=np.array([])):
     uvel = ds.UVEL.values
     vvel = ds.VVEL.values
     X,Y = np.meshgrid(range(uvel.shape[3]),range(uvel.shape[2]))
-    print(fpath)
     thetabot,ubot,vbot = np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0)
     thetatop,utop,vtop = np.full_like(theta[1,1],0),np.full_like(theta[1,1],0),np.full_like(theta[1,1],0)
     count=0
@@ -674,8 +1284,6 @@ def bottomVtop(fname,description,times=np.array([])):
             vtop +=  np.nanmean(vvel[k] * icem,axis=0)
     thetabot = thetabot/count
     thetatop = thetatop/count
-    print(thetabot.shape)
-    print(X.shape)
     ax1.pcolormesh(X,Y,thetabot,vmin=-2,vmax=2,cmap="jet")
 
     ax2.pcolormesh(X,Y,thetatop,vmin=-2,vmax=2,cmap="jet")
@@ -738,62 +1346,96 @@ def iceFaceMelt(fname,description,times=np.array([])):
 def bottomMask(fname,ds,thresh=10):
     vals = grabMatVars(fname,("h","icedraft"))
     h = np.abs(np.asarray(vals["h"]))
-    print(ds)
     Znew = np.zeros(ds.THETA.shape[1:])
     for l in range(Znew.shape[0]):
         Znew[l,:,:]=ds.Z.values[l]
     bottom_dist = Znew-(-h.T)
-    return np.logical_and(bottom_dist < 50,bottom_dist>0)
+    return np.logical_and(np.logical_and(bottom_dist < 50,bottom_dist>0),ds.hFacC.values>0)
 
 def icemask(fname,ds,thresh=10):
     vals = grabMatVars(fname,("h","icedraft"))
     icedraft = np.abs(np.asarray(vals["icedraft"]))
-    print(np.nanmin(icedraft))
     Znew = np.zeros(ds.THETA.shape[1:])
     for l in range(Znew.shape[0]):
         Znew[l,:,:]=ds.Z.values[l]
     bottom_dist = Znew-(-icedraft.T)
 
-    return np.logical_and(bottom_dist > -20,bottom_dist<0)
+    return np.logical_and(np.logical_and(bottom_dist > -20,bottom_dist<0),ds.hFacC.values>0)
 
 
-def fullOnGPrime(ds,fname):
+def mixedLayerQuant(ds,fname):
     THETA = ds.THETA.values
-    print(ds.THETA)
     SALT = ds.SALT.values
-    vals = grabMatVars(fname,("icedraft"))
+    UVEL = ds.UVEL.values
+    VVEL = ds.VVEL.values
+    vals = grabMatVars(fname,("icedraft","Zcdw_pt_South"))
     icedraft = np.abs(np.asarray(vals["icedraft"]))
+    max_height = float(vals["Zcdw_pt_South"][0][0])
+    tcline_height = (max_height-75)/2.0+75
     idmask=icedraft>0
     gprimes = []
-    print("GPRIME TIME")
+    ssurf = []
+    scdw = []
+    tsurf = []
+    tcdw = []
+
+    Zfull = np.asarray(list(ds.Z))
+    froudes = []
     for t_index in tqdm(range(THETA.shape[0])):
         gprimes_t = []
-        #gprimemap = np.full_like(THETA[0,0,:,:],np.nan)
+        ssurf_t = []
+        scdw_t = []
+        tsurf_t = []
+        tcdw_t = []
+        froude_map = np.full_like(THETA[0,0,:,:],np.nan)
         for y_index in range(THETA.shape[2]):
             for x_index in range(THETA.shape[3]):
                 tcast = THETA[t_index,:,y_index,x_index]
                 scast = SALT[t_index,:,y_index,x_index]
-                if (np.sum(abs(scast)>0.1)>10) and idmask[x_index,y_index] and y_index<60:
+                ucast = UVEL[t_index,:,y_index,x_index]
+                vcast = VVEL[t_index,:,y_index,x_index]
+                if (np.sum(abs(scast)>0.1)>2) and idmask[x_index,y_index]:
                     t = tcast[scast>0.1]
+                    Z = Zfull[scast>0.1]
+                    u = ucast[scast>0.1]
+                    v = vcast[scast>0.1]
                     s = scast[scast>0.1]
-                    d = dens(s,t,0)
-                    if np.sum(d-d[0]>0.03)>0:#and np.sum(t>0.5)>0:
-                        mldi = np.where(d-d[0]>0.03)[0][0]
-
+                    #t = tcast
+                    #s = scast
+                    if np.sum(abs(t-t[0])>0.1)>0:#and np.sum(t>0.5)>0:
+                        mldi = np.where(abs(t-t[0])>0.1)[0][0]
+                        d = dens(s,t,Z[mldi])
                         #cdwi = np.where(t>0)[0][0]
                         rho_1 = np.nanmean(d[:mldi])
-                        rho_2 = np.nanmean(d[mldi:min(mldi*2,len(d)-1)])
+                        rho_2 = np.nanmean(d[mldi:max(mldi*2,len(d)-1)])
                         gprimes_t.append(9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2)))
-                        #gprimemap[y_index,x_index] = gprimes_t[-1]
-        #plt.imshow(gprimemap)
+                        ssurf_t.append(np.nanmean(s[:mldi]))
+                        scdw_t.append(np.nanmean(s[mldi:max(mldi*2,len(s)-1)]))
+                        tsurf_t.append(np.nanmean(t[:mldi]))
+                        tcdw_t.append(np.nanmean(t[mldi:max(mldi*2,len(t)-1)]))
+                        velmagcdw = np.nanmean(np.sqrt(u[mldi:max(mldi*2,len(t)-1)]**2+v[mldi:max(mldi*2,len(t)-1)]**2))
+                        velmagsurf = np.nanmean(np.sqrt(u[:mldi]**2+v[:mldi]**2))
+                        
+                        froude_map[y_index,x_index]= np.nanmean(np.diff(d)/np.diff(Z))#Z[0]-Z[-1]#np.sqrt((velmagcdw/np.sqrt(gprimes_t[-1]*np.ptp(Z[mldi:max(mldi*2,len(t)-1)])))**2 + (velmagsurf/np.sqrt(gprimes_t[-1]*np.ptp(Z[:mldi+1])))**2)
+                        #froude_map[y_index,x_index]= np.ptp(Z)
+
+        #print(fname)
+        #plt.imshow(froude_map,vmin=0,vmax=1,cmap="jet")
+        #plt.pcolormesh(ds.XC.values,ds.YC.values,froude_map,cmap="jet")
+        #plt.colorbar()
         #plt.show()
-        gprimes.append(np.nanmedian(gprimes_t))
-    return gprimes
+        #froudes.append(np.nanmean(froude_map))
+
+        gprimes.append(np.nanmean(gprimes_t))
+        ssurf.append(np.nanmean(ssurf_t))
+        scdw.append(np.nanmean(scdw_t))
+        tsurf.append(np.nanmean(tsurf_t))
+        tcdw.append(np.nanmean(tcdw_t))
+    #plt.imshow(gprimemap)
+    #plt.show()
+    return gprimes,ssurf,scdw,tsurf,tcdw,froudes#,froudesurf,froudecdw
 
 
-
-
-    
     
 def outPath(resultspath):
     nameparts = resultspath.split("/")
@@ -801,54 +1443,81 @@ def outPath(resultspath):
     fpath = "/".join((nameparts[:-5]+["pics"] + [shortname]))
     return shortname, fpath
     
-def meltMapAverage(fname,description,quant="THETA",res=1,dim="zonal"):
-    fig,ax1 = plt.subplots(figsize=(10,8))
+def meltMapAverage(fname,description,quant="THETA",res=1,dim="zonal",ax1=None):
+    if not ax1:
+        fig,ax1 = plt.subplots(figsize=(10,8))
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
     mask = np.logical_and(ds.hFacC.values[0]==0,np.sum(ds.hFacC.values,axis=0)!=0)
+    times = times*grabDeltaT(fname)/60.0/60.0/24.0/365.0
     melt= -np.nanmean(ds.SHIfwFlx.values[times>2.5],axis=0)*(60*60*24*365)*(1/920.0)
     xs = ds.XG.values/1000
     ys = ds.YG.values/1000
     newcmap = cmocean.tools.crop(cmocean.cm.balance, 0, 45, 0)
-    im = ax1.pcolormesh(xs,ys,melt,cmap=newcmap,vmin=0,vmax=45)
-    ax1.set_xlim((140,260))
-    ax1.set_ylim((0,160))
-    plt.xlabel("x (km)",fontsize=18)
-    plt.ylabel("y (km)",fontsize=18)
+
+    vals = grabMatVars(fname,("h","icedraft"))
+    icedraft = np.abs(np.asarray(vals["icedraft"]))
+    h = np.abs(np.asarray(vals["h"]))
+    icedraft = np.logical_and(icedraft!=0,icedraft!=h)
+    melt[~icedraft.T]=np.nan
+    
+    im = ax1.pcolormesh(xs,ys,melt,cmap=newcmap,vmin=0,vmax=25)
+
+    bound = np.argwhere(~np.isnan(melt))
+
+    #ax2.set_xlim((140,260))
+    #ax2.set_ylim((0,160))
+    pad = 10
+    ax1.set_xlim(xs[min(bound[:, 1])]-pad, xs[max(bound[:, 1])]+pad)
+    ax1.set_ylim(ys[min(bound[:, 0])]-pad, ys[max(bound[:, 0])]+pad)
+
+    ax1.set_xlabel("x (km)",fontsize=18)
+    ax1.set_ylabel("y (km)",fontsize=18)
     plt.xticks(fontsize=15)
     plt.yticks(fontsize=15)
-    caxout = plt.colorbar(im, aspect=40,shrink=0.8,ticks=range(0,41,10))
-    caxout.ax.tick_params(labelsize=18)
-    plt.show()
+    caxout = inset_axes(
+        ax1,
+        width="2%",  # width: 5% of parent_bbox width
+        height="40%",  # height: 50%
+        loc="lower left",
+        bbox_to_anchor=(1.0, 0.30, 1, 1),
+        bbox_transform=ax1.transAxes,
+        borderpad=1,
+    )
+    caxout.tick_params(labelsize=18)
+    plt.colorbar(im,cax=caxout,ticks=[0,20])
+    caxout.set_ylabel('m/yr', rotation=0,fontsize=18)
+
+    ax1.set_ylabel('Y (km)',fontsize=18)
+    ax1.set_xlabel('X (km)',fontsize=18)
+
+    #caxout = plt.colorbar(im,ax=ax1, aspect=40,shrink=0.4,ticks=range(0,41,10))
+    #caxout.ax.tick_params(labelsize=18)
+    #plt.show()
 
 
-def crossSectionAverage(fname,description,quant="THETA",res=1,dim="zonal"):
-    fig,ax1 = plt.subplots(figsize=(10,8))
+def crossSectionAverage(fname,description,quant="THETA",res=1,dim="zonal",ax1=None,show=True):
+    if not ax1:
+        fig,ax1 = plt.subplots(figsize=(10,8))
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
-    print(quant)
     if quant!="DENS":
         ds = open_mdsdataset(fname,prefix=["THETA"],ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-        print(ds)
-
 
         if dim == "zonal":
             #zonal_average = ds.where(ds.hFacC==1).mean(dim="XC",skipna=True)
             zonal_average = ds.sel(XC=200*10**3,method="nearest",drop=True)
-            print(zonal_average)
             ys = zonal_average.YC.values
         if dim == "meridional":
             zonal_average = ds.isel(YC=50)
             ys = zonal_average.XC.values
         zvals = zonal_average[quant].values
-        print("zval",zvals.shape)
-        print(zonal_average.hFacC)
         #zvals[:,zonal_average.hFacC.values!=1]=np.nan
         #zvals[zvals==0]=np.nan
         m = np.nanmedian(zvals)
         s = np.nanstd(zvals)
-        tmin, tmax = m-5*s,m+s*2
+        tmin, tmax = m-2*s,m+s*2
         shortname, fpath = outPath(fname) 
         #plt.hist(zvals[:,:,:].flatten())
         #plt.show()
@@ -869,6 +1538,8 @@ def crossSectionAverage(fname,description,quant="THETA",res=1,dim="zonal"):
         #tmin, tmax = np.nanmin(zonal_average[quant]), np.nanmax(zonal_average[quant])
         zvals = (zonal_average["SALT"].values,zonal_average["THETA"].values)
         length = zvals[0].shape[0]
+
+    times = times*grabDeltaT(fname)/60.0/60.0/24.0/365.0
     zvals=np.nanmean(zvals[times>2.5],axis=0)
     newys = []
     for i in range(len(ys)-1):
@@ -906,7 +1577,11 @@ def crossSectionAverage(fname,description,quant="THETA",res=1,dim="zonal"):
     plt.xticks(fontsize=16)
     plt.yticks(fontsize=16)
 
-    y = np.array([[0.05,0], [0.05,-0.953], [150.8,-.205-0.1], [150.8,0], [0.05,0]])
+    variables = grabMatVars(fname,("Xeast","Xwest","Yicefront"))
+    yice = float(variables["Yicefront"])/1000
+    ices = volume(fname)
+    C=(-.205)-yice*ices
+    y = np.array([[0.05,0], [0.05,0.05*ices+C], [yice + 0.8,-.205-0.1], [yice + 0.8,0], [0.05,0]])
     p = Polygon(y, facecolor = '#8addf9',zorder=4)
     ax1.add_patch(p)
 
@@ -925,11 +1600,10 @@ def crossSectionAverage(fname,description,quant="THETA",res=1,dim="zonal"):
     )
     caxout.tick_params(labelsize=18)
     plt.colorbar(c,cax=caxout,ticks=[-2,0,1])
+    caxout.set_ylabel('$^\circ$C', rotation=0,fontsize=18)
 
     ax1.set_ylabel('Depth (km)',fontsize=18)
     ax1.set_xlabel('Cross Shelf Distance (km)',fontsize=18)
-    plt.show()
-    plt.close()
 
 
 
@@ -946,9 +1620,9 @@ def crossSectionAnim(fname,description,quant="THETA",res=1,dim="meridional"):
     moviewriter = FFMpegFileWriter(fps=1)
     if quant!="DENS":
         ds = open_mdsdataset(fname,prefix=quant,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-        print(ds)
         if dim == "zonal":
-            zonal_average = ds.where(ds.hFacC==1).mean(dim="XC",skipna=True)
+            #zonal_average = ds.where(ds.hFacC==1).mean(dim="XC",skipna=True)
+            zonal_average = ds.isel(XC=75)
             ys = zonal_average.YC.values
         if dim == "meridional":
             zonal_average = ds.isel(YC=50)
@@ -980,15 +1654,14 @@ def crossSectionAnim(fname,description,quant="THETA",res=1,dim="meridional"):
         #tmin, tmax = np.nanmin(zonal_average[quant]), np.nanmax(zonal_average[quant])
         zvals = (zonal_average["SALT"].values,zonal_average["THETA"].values)
         length = zvals[0].shape[0]
-    print("starting movie")
     with moviewriter.saving(fig, fpath+quant+"|"+dim+".mp4" , dpi=250):
         for k in tqdm(range(0,length,res)):
             if quant == "DENS":
                 frame = ax1.pcolormesh(ys,zs,gsw.sigma0(zvals[0][k,:,:],zvals[1][k,:,:]),cmap="jet",vmin=27.4,vmax=27.7)
             elif quant == "THETA":
-                frame = ax1.imshow(zvals[k,:,:],cmap="jet",vmin=-0.5,vmax=1)
+                frame = ax1.pcolormesh(ys,zs,zvals[k,:,:],cmap="jet",vmin=-0.5,vmax=1)
             elif quant == "SALT":
-                frame = ax1.imshow(zvals[k,:,:],cmap="jet",vmin=34,vmax=34.8)
+                frame = ax1.pcolormesh(ys,zs,zvals[k,:,:],cmap="jet",vmin=34,vmax=34.8)
             else:
                 frame = ax1.imshow(zvals[k,:,:],cmap="jet")
             cb = plt.colorbar(frame)
@@ -997,7 +1670,7 @@ def crossSectionAnim(fname,description,quant="THETA",res=1,dim="meridional"):
             frame.remove()
     plt.close()
 
-def bottomAnim(fname,description,times=np.array([]),quant="SALT",res=5):
+def bottomAnim(fname,description,times=np.array([]),quant="THETA",res=5):
     fig,ax1 = plt.subplots()
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
@@ -1018,10 +1691,10 @@ def bottomAnim(fname,description,times=np.array([]),quant="SALT",res=5):
             X = np.full_like(d,np.nan,dtype=float)
             X[ds.hFacC.values != 0]= d[ds.hFacC.values != 0]
             znew = np.multiply(zmask,X)
-            nancount = icesurfacevelnp.nansum(np.isnan(znew),axis=0)
+            nancount = np.nansum(np.isnan(znew),axis=0)
             znew = np.nansum(znew,axis=0)
             znew[nancount==X.shape[0]] = np.nan
-            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet",vmin=34.4,vmax=34.65)
+            frame = ax1.pcolormesh(ds.XC.values,ds.YC.values,znew,cmap="jet",vmin=-2,vmax=1)
             ax1.contour(ds.XC.values,ds.YC.values,depth,colors="black",levels=20)
             cb = plt.colorbar(frame)
             moviewriter.grab_frame()
@@ -1073,55 +1746,6 @@ def getIterNums(fpath):
             saltiters.append(n)
     return np.unique(np.asarray(np.intersect1d(iters,saltiters)))[:-1]
 
-
-def generateRunsTable(fnames):
-    table = []
-    prettynames = {'shelf_depth':"Nominal depth of shelf", \
-            'rng_seed':"Random bathymetry seed used", 'random_amplitude':"Amplitude of random bathymetry",\
-            'cavity_depth':"Depth of cavity relative to depth of shelf", 'cavity_width': "Width of cavity",\
-            'yicefront':"Northward extent of ice shelf"}#, 'tcline_atshelf_depth': "Depth of temperature maximum"}
-    for fname in fnames:
-        variables = grabMatVars(fname,("experiment_parameters"))
-        fields = variables["experiment_parameters"][0][0].__dict__
-        d = {}
-        for l in fields.keys():
-            if l in prettynames.keys():
-                d[prettynames[l]] = fields[l][0][0]
-        if d not in table:
-            table.append(d)
-    print(tabulate(table,headers="keys",tablefmt="latex",maxcolwidths=[8]*len(table[0].keys())))
-    return table
-        
-
-# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at0d400/results/","",dim="zonal",quant="THETA")
-# crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at125d400/results/","",dim="zonal",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at-300d400/results/","",dim="zonal",quant="THETA")
-#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w250/results/","",dim="meridional",quant="DENS")
-#meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w100/results/","")
-#meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w50/results/","")
-#meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w250/results/","")
-#bottomAnim("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at0d400/results/","")
-# #meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/at0d400/results/","")
-# fnames = [] 
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/*/", recursive = True):
-#     fnames.append(f)
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-GLIB-explore-101/*/", recursive = True):
-#     fnames.append(f)
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/shelfzexp-highres-GLIB-explore-101/*/", recursive = True):
-#     fnames.append(f)
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/icefront-GLIB-explore-32/*/", recursive = True):
-#     fnames.append(f)
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/inverse-GLIB-explore-32/*/", recursive = True):
-#     fnames.append(f)
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/slope200-GLIB-explore-18/*/", recursive = True):
-#     fnames.append(f)
-# for f in glob.glob("/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18/*/", recursive = True):
-#     fnames.append(f)
-#
-# generateRunsTable(fnames)
-#
-#meltmap("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w250/results/","")
-#
 def legendFunction(runsdict):
     conversion={"d0":"cavityd0","d-200":"cavityd-200","slope200":"cavityd200","slope375":"cavityd375"}
     for k in runsdict.keys():
@@ -1145,16 +1769,43 @@ def folderMapTimeSeries(runsdict,save=True):
                 key=runsdict[k]["specialstring"][l]
                 if key and key in f:
                     try:
-                        timeSeriesDashboard(f+"/results",key,fig,axises,color=runsdict[k]["color"][l])
+                        timeSeriesDashboard(f+"/results",key+f[-6:-10],fig,axises,color=runsdict[k]["color"][l])
                     except:
                         print("yeesh")
+                else:
+                    try:
+                        timeSeriesDashboard(f+"/results","",fig,axises,color=runsdict[k]["color"][l])
+                    except:
+                        print("yeesh")
+    axises[0][0].legend()
+
     plt.show()
+
+def fastExplosionCheck(runsdict,save=True):
+    fig,axises = plt.subplots(2,3,figsize=(8,7))
+    count = [0,0]
+    for k in tqdm(runsdict.keys()):
+        for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
+            for l in range(len(runsdict[k]["specialstring"])):
+                key=runsdict[k]["specialstring"][l]
+                if key and key in f:
+                    
+                    try:
+                        with open(f+"/results/STDOUT.0000") as myfile:
+                            if 'NaN' in myfile.read():
+                                print(f, "oh no a NaN!")
+                            else:
+                                count[0]=count[0]+1
+                            count[1]=count[1]+1
+                    except:
+                        print("no STDOUT")
+    print(count)
+
 
 def folderMap(runsdict,save=True):
     fig,axises = plt.subplots(1,1,figsize=(8,7))
     xs,ys,eyeds = [],[],{}
     for k in runsdict.keys():
-        print(k)
         for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
             for l in range(len(runsdict[k]["specialstring"])):
                 key=runsdict[k]["specialstring"][l]
@@ -1177,101 +1828,128 @@ def folderMap(runsdict,save=True):
                     except:
                         print("yeesh")
     xs = np.asarray(([xs])).reshape((-1, 1))
-    print(xs,ys)
     model = LinearRegression().fit(xs, ys)
-    print(model.score(xs, ys))
+    rho0 = 1025
+    rhoi = 910
+    Cp = 4186
+    If = 334000
+    C = model.coef_
+    #W0 = (rho0*Cp)/(rhoi*If*C)
+    W0 =  325000#(rho0*Cp)/(rhoi*If*C)
+    alpha =  C/((rho0*Cp)/(rhoi*If*W0))
     oldxs=xs
+    #xs= xs*(rho0*Cp)/(rhoi*If*325000)
     xs=model.predict(xs)
     plt.text(.05, .95, '$r^2=$'+str(round(model.score(oldxs,ys),2)), ha='left', va='top', transform=plt.gca().transAxes,fontsize=12)
+
+    plt.xlabel("$\dot{m}_{\mathrm{pred}}$",fontsize=18)
+    plt.ylabel("$\dot{m}_{\mathrm{model}}$",fontsize=18)
+    plt.plot(range(0,25),range(0,25),linestyle="dashed")
+    plt.xlim(0,25)
+    plt.ylim(0,25)
     for k in runsdict.keys():
         for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
             for l in range(len(runsdict[k]["specialstring"])):
                 key=runsdict[k]["specialstring"][l]
                 if key and key in f:
                     if f+str(l) in eyeds.keys():
-                        steadyStateAverageSimple(f+"/results",xs[eyeds[f+str(l)]],fig,axises,color=runsdict[k]["color"][l],marker=runsdict[k]["marker"][l],title=runsdict[k]["description"][0])
+                        steadyStateAverageSimple(f+"/results",xs[eyeds[f+str(l)]]*(60*60*24*365),fig,axises,color=runsdict[k]["color"][l],marker=runsdict[k]["marker"][l],title=runsdict[k]["description"][0])
                 elif not key:
                     try:
                         if f+str(l) in eyeds.keys():
-                            steadyStateAverageSimple(f+"/results",xs[eyeds[f+str(l)]],fig,axises,color=runsdict[k]["color"][l],marker=runsdict[k]["marker"][l],title=runsdict[k]["description"][0])
+                            steadyStateAverageSimple(f+"/results",xs[eyeds[f+str(l)]]*(60*60*24*365),fig,axises,color=runsdict[k]["color"][l],marker=runsdict[k]["marker"][l],title=runsdict[k]["description"][0])
                     except:
                         print("yeesh")
             if save:
                 plt.savefig("/home/garrett/Projects/HUB/paperfigures/"+k+".png")
 
-def folderMapHT(runsdict,save=True):
+def folderMapGeneric(func,runsdict,save=True):
     fig,axises = plt.subplots(1,1,figsize=(8,7))
-    #xs,ys,eyeds = [],[],{}
-    #for k in runsdict.keys():
-        #print(k)
-        #for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
-            #for l in range(len(runsdict[k]["specialstring"])):
-                #key=runsdict[k]["specialstring"][l]
-                #if key and key in f:
-                    #try:
-                        #x,y=FStheory(f+"/results",None)
-                        #if ~np.isnan(y):
-                            #xs.append(x)
-                            #ys.append(y)
-                            #eyeds[f+str(l)]=len(xs)-1
-                    #except:
-                        #print("yeesh")
-                #elif not key:
-                    #try:
-                        #x,y=FStheory(f+"/results",None)
-                        #if ~np.isnan(y):
-                            #xs.append(x)
-                            #ys.append(y)
-                            #eyeds[f+str(l)]=len(xs)-1
-                    #except:
-                        #print("yeesh")
-    #xs = np.asarray(([xs])).reshape((-1, 1))
-    #print(xs,ys)
-    #model = LinearRegression().fit(xs, ys)
-    #print(model.score(xs, ys))
-    #oldxs=xs
-    #xs=model.predict(xs)
-    #plt.text(.05, .95, '$r^2=$'+str(round(model.score(oldxs,ys),2)), ha='left', va='top', transform=plt.gca().transAxes,fontsize=12)
     for k in runsdict.keys():
         for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
             for l in range(len(runsdict[k]["specialstring"])):
                 key=runsdict[k]["specialstring"][l]
                 if key and key in f:
                     try:
-                        steadyStateHT(f+"/results",None,fig,axises,color=runsdict[k]["color"][l],marker=runsdict[k]["marker"][l],title=runsdict[k]["description"][0])
+                        func(f+"/results",None,fig,axises,color=runsdict[k]["color"][l],marker=runsdict[k]["marker"][l],title=runsdict[k]["description"][0])
                     except:
                         print("yeesh")
+                elif not key:
+                    #try:
+                    func(f+"/results",None,fig,axises,color=runsdict[k]["color"][l],marker=runsdict[k]["marker"][l],title=runsdict[k]["description"][0])
+                    #except:
+                        #print("yeesh")
+
             if save:
                 plt.savefig("/home/garrett/Projects/HUB/paperfigures/"+k+".png")
-        
+
+def folderMapMoreGeneric(func,runsdict):
+    for k in runsdict.keys():
+        for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
+            for l in range(len(runsdict[k]["specialstring"])):
+                print(f)
+                key=runsdict[k]["specialstring"][l]
+                if "at125" in f:
+                    if key and key in f:
+                        #try:
+                        func(f+"/results",key)
+                        #except:
+                        #print("yeesh")
+                    elif not key:
+                        #try:
+                        func(f+"/results",key)
+                        #except:
+                            #print("yeesh")
+
+
+def folderMapRefresh(runsdict,save=True):
+    fig,axises = plt.subplots(1,1,figsize=(8,7))
+    for k in runsdict.keys():
+        for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
+            for l in range(len(runsdict[k]["specialstring"])):
+                key=runsdict[k]["specialstring"][l]
+                if key and key in f :
+                    try:
+                        timeSeries(f+"/results",True)
+                    except:
+                        print("yeesh")
+                elif not key:
+                    try:
+                        if f+str(l) in eyeds.keys():
+                            timeSeries(f+"/results",True)
+                    except:
+                        print("yeesh")
+
+            if save:
+                plt.savefig("/home/garrett/Projects/HUB/paperfigures/"+k+".png")
+       
 runsdict = {\
-        "inverse-GLIB-explore-32":{"specialstring":['d0','d-200'], "marker":["D","D"] ,"color":["purple","orange"],"description":["Without a sill"]},\
-        "shelfzexp-GLIB-explore-101":{"specialstring":['d200','d400','d500','d700','d800'], "marker":["x","x","x","x","x"] ,"color":["orange","purple","gray","green","red"],"description":["Different shelf depths"]},\
+        "icefront-64":{"specialstring":['y100','y250'], "marker":["^","^"] ,"color":["orange","purple"],"description":["Different ice front distances"]},\
+        "shelfdepth-16":{"specialstring":['d500','d600','d700'], "marker":["x","x","x","x"] ,"color":["purple","gray","green","red"],"description":["Different shelf depths"]},\
         "widthexp-GLIB-explore-32":{"specialstring":['w50','w100','w250'], "marker":["o","o","o"] ,"color":["orange","purple","gray"],"description":["Different shelf widths" ]},\
-        "icefront-GLIB-explore-32":{"specialstring":['y100','y250','y280'], "marker":["^","^","^"] ,"color":["orange","purple","gray"],"description":["Different ice front distances"]},\
-        "slope200-GLIB-explore-18":{"specialstring":[False], "marker":["_"] ,"color":["orange"],"description":["Less steep slope"]},\
-        "slope375-GLIB-explore-18":{"specialstring":[False], "marker":["_"] ,"color":["purple"],"description":["more steep slope"]}\
+        "slope-22":{"specialstring":["s300","s150","s0"], "marker":["D","D","D"] ,"color":["red","green","blue"],"description":["more steep slope"]},\
+        "reference":{"specialstring":["ref"], "marker":["p"] ,"color":["black"],"description":["more steep slope"]}\
         }
-#folderMapTimeSeries(runsdict)
-#crossSectionAverage("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at0w100/results/","")
-#circulationFigure("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at0w100/results","")
-#meltMapAverage("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at0w100/results","")
 
+generateRunsTable(runsdict)
 #legendFunction(runsdict)
-#topMap("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w250/results/","")
-#topMap("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w100/results/","")
-#topMap("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w50/results/","")
 
-##ds = open_mdsdataset("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at125w250/results/",ignore_unknown_vars=True,prefix=["THETA","THETA_inst"])
-#print(list(ds.keys()))
-#folderMapHT(runsdict,save=False)
-folderMap(runsdict,save=False)
-#plt.xticks(fontsize=12)
-#plt.yticks(fontsize=12)
-#plt.plot(range(23),range(23),linestyle='dashed',color="black")
-#plt.ylabel(r'$\dot{m}_{\mathrm{obs}} (m/yr)$',fontsize=18)
-#plt.xlabel(r'$\dot{m}_{\mathrm{pred}} (m/yr)$',fontsize=18)
-#
-plt.show()
+#fastExplosionCheck(runsdict)
+#folderMapRefresh(runsdict)
+#folderMapTimeSeries(runsdict)
+#folderMap(runsdict)
+#folderMapMoreGeneric(crossAndMelt,runsdict)
+#plt.show()
+#crossSectionAverage("/home/garrett/Projects/MITgcm_ISC/experiments/reference/at125/results","Reference")
+#plt.show()
+#circulationFigure("/home/garrett/Projects/MITgcm_ISC/experiments/reference/at125/results","Reference")
+#plt.show()
 
+######FIX ITERNUMS PROBLEM
+#folderMapGeneric(steadyStateAverageSimple,runsdict)
+#folderMapGeneric(gprimeWidth,runsdict)
+#folderMapGeneric(saltBudget,runsdict)
+#plt.show()
+#folderMapGeneric(steadyStateAverageSimple,runsdict)
+#plt.show()
 

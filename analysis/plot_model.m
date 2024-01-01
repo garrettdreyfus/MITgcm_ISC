@@ -1,7 +1,6 @@
 %%%
 %%% plot_model.m
 %%%
-%%% Plot the model configuration for the undercurrent project 
 %%%
 function plot_model(expdir,expname,outputname,boundary)
 
@@ -13,8 +12,8 @@ function plot_model(expdir,expname,outputname,boundary)
     %addpath /Users/csi/MITgcm_UC/analysis_uc/colormaps/cmocean/;
     %addpath /Users/csi/Software/eos80_legacy_gamma_n/;
     %addpath /Users/csi/Software/eos80_legacy_gamma_n/library/;
-    addpath /home/garrett/Documents/gsw_matlab;
-    addpath /home/garrett/Documents/gsw_matlab/library;
+    addpath /home/garrett/Documents/GSW;
+    addpath /home/garrett/Documents/GSW/library;
     addpath /home/garrett/Documents/freezecolors;
     %addpath /Users/csi/Software/gsw_matlab_v3_06_11/library/;
 
@@ -26,7 +25,10 @@ function plot_model(expdir,expname,outputname,boundary)
     fontsize = 25;
     ncolor=250; % Number of color contours
     m1km = 1000;
-    load_data;
+    isotherm = true;
+    if isotherm
+        load_data;
+    end
 
 
     % bathycolor = hex2rgb('#958872');
@@ -63,7 +65,7 @@ function plot_model(expdir,expname,outputname,boundary)
     [YY,XX,ZZ]=meshgrid(yy/1000,xx/1000,zz/1000);
     [ZZZ,YYY] = meshgrid(zz/1000,yy/1000);
 
-    if boundary
+    if isotherm &&  boundary
         idx_1 = 1;
         BC_u = squeeze(uu(idx_1,:,:));
         BC_u(BC_u==0) = NaN;
@@ -113,7 +115,7 @@ function plot_model(expdir,expname,outputname,boundary)
     p.FaceColor = icetopcolor;
     p.EdgeColor = 'none';
     alpha(p,1);
-    if boundary
+    if isotherm && boundary
         ttmod = tt;
         ttmod(5,:,:)=NaN;
 
@@ -164,11 +166,9 @@ function plot_model(expdir,expname,outputname,boundary)
     box on;
     grid off;
 
-
-
      figdir = '/home/garrett/Projects/HUB/paperfigures/';
     [figdir outputname]
-     print('-dpng','-r300',[figdir outputname]);
+     print('-dpng','-r200',[figdir outputname]);
     
 end
     

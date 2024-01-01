@@ -1,7 +1,7 @@
     
     
 
-    nIter = 2522880;
+    nIter = 2815714;
 clear oceTAUX oceTAUY
 %     if(expname(end-4:end)=='_prod')
     if(false)

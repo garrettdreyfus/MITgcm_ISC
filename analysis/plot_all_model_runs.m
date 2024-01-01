@@ -3,9 +3,9 @@ foldernames =  GetSubDirsFirstLevelOnly(rootdir)
 for i = 1:numel(foldernames)
     experimentnames =  GetSubDirsFirstLevelOnly([rootdir foldernames{i}]);
     foldernames{i}
-    for j = 1:2%numel(experimentnames)
+    for j = 1:numel(experimentnames)
         try
-            plot_model([rootdir foldernames{i}], experimentnames{j},[foldernames{i} '|' experimentnames{j}],false);
+            plot_model([rootdir foldernames{i}], experimentnames{j},['geometries/' foldernames{i} '|' experimentnames{j}],false);
         catch
             [rootdir foldernames{i}]
         end
