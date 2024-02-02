@@ -23,7 +23,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   %%%%%%%%%%%%%%%%%%      
   
   %%% If set true, plots of prescribed variables will be shown
-  showplots = true;      
+  showplots = false;      
   fignum = 1;
   fontsize = 12;
   
@@ -455,25 +455,27 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   end
  
   %%% Plot ice
-  hold on;
-  p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icedraft_plot(:,2:end-1));
-  p.FaceColor = [153, 255, 255]/255;
-  p.EdgeColor = 'none';
-  p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icetop_plot(:,2:end-1));
-  p.FaceColor = [153, 255, 255]/255;
-  p.EdgeColor = 'none';
-  hold off;
+  if (showplots)
+      hold on;
+      p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icedraft_plot(:,2:end-1));
+      p.FaceColor = [153, 255, 255]/255;
+      p.EdgeColor = 'none';
+      p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icetop_plot(:,2:end-1));
+      p.FaceColor = [153, 255, 255]/255;
+      p.EdgeColor = 'none';
+      hold off;
 
-  %%% Decorations
-  view(-206,14);
-  axis tight;
-  xlabel('x (km)','interpreter','latex');
-  ylabel('y (km)','interpreter','latex');
-  zlabel('z (m)','interpreter','latex');
-  pbaspect([Lx/Ly 1 1]);
-  camlight('headlight');
-  lightangle(-206,34);
-  lighting gouraud;
+      %%% Decorations
+      view(-206,14);
+      axis tight;
+      xlabel('x (km)','interpreter','latex');
+      ylabel('y (km)','interpreter','latex');
+      zlabel('z (m)','interpreter','latex');
+      pbaspect([Lx/Ly 1 1]);
+      camlight('headlight');
+      lightangle(-206,34);
+      lighting gouraud;
+  end
   
   %%% Save as a parameter
   writeDataset(h,fullfile(inputpath,'bathyFile.bin'),ieee,prec);
@@ -507,6 +509,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   % at -1500
   
   Zcdw_pt_shelf = HUB+experiment_parameters.tcline_atshelf_depth; %%% CDW depth over the shelf
+
   Zcdw_pt_South = Zcdw_pt_shelf + experiment_parameters.tcline_deltaz; %%% CDW depth at the southern boundary
 
   lat_Zcdw_pt = [0 Yshelfbreak Ydeep Ly];
@@ -598,7 +601,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   uEast = uEast_TWV;
 
   %%% Plot the relaxation temperature
-  if (showplots || true)
+  if (showplots)
 
     figure(fignum);
     fignum = fignum + 1;

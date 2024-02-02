@@ -1,4 +1,4 @@
-function runWidthCheck()
+function runReference()
   %% Depth at this seed is 465
   experiment_parameters = struct;
   experiment_parameters.tcline_deltaz = 100;

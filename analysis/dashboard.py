@@ -313,17 +313,23 @@ def FStheory(fname,xval):
         rho_2 = np.nanmean(d[mldi:min(mldi*2,len(d)-1)])
         gprime_ext = 9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2))
     #gprime_ext = 9.8*(np.mean(localdens[zpyci:min(zpyci+10,len(localdens)-1)])-np.mean(localdens[max(0,zpyci-10):zpyci]))/np.mean(localdens[:min(zpyci*2,len(localdens)-1)])
-    rho_1i = np.logical_and(zz<zz[zpyci],zz>zz[zpyci]-25)
-    rho_2i = np.logical_and(zz<zz[zpyci]+25,zz>zz[zpyci])
+    rho_1i = np.logical_and(zz<zz[zpyci],zz>zz[zpyci]-zpyci)
+    rho_2i = np.logical_and(zz<zz[zpyci]+zpyci,zz>zz[zpyci])
+    print(rho_1i)
+    print(rho_2i)
     gprime_ext = 9.8*(np.mean(localdens[rho_1i])-np.mean(localdens[rho_2i]))/np.mean(localdens[np.logical_or(rho_1i,rho_2i)])
 
     deltaH = -(abs(tcline_height)- abs(glib))
+    if "reference" in fname and "at125" in fname:
+        print(tcline_height)
+
     f = 1.3*10**-4
     rho0 = 1025
     rhoi = 910
     Cp = 4186
     If = 334000
 
+    print(glibxval,deltaH,gprime_ext,f,ices)
     #return glibxval*deltaH*gprime_ext/f*ices,-data["shiflx"]
     #return glibxval*deltaH*(gprime_ext/625000)/f*ices,-data["shiflx"]
     #return (glibxval)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365)
@@ -341,6 +347,7 @@ def depthFromdZ(ds):
     z[-1,:,:]=0
     zmask = z
     return np.sum(zmask*Z,axis=0)
+
 def barotropic_streamfunction_max(fname,times=np.array([]),res=1):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
@@ -1655,6 +1662,7 @@ def crossSectionAnim(fname,description,quant="THETA",res=1,dim="meridional"):
         zvals = (zonal_average["SALT"].values,zonal_average["THETA"].values)
         length = zvals[0].shape[0]
     with moviewriter.saving(fig, fpath+quant+"|"+dim+".mp4" , dpi=250):
+        print(fpath+quant+"|"+dim+".mp4")
         for k in tqdm(range(0,length,res)):
             if quant == "DENS":
                 frame = ax1.pcolormesh(ys,zs,gsw.sigma0(zvals[0][k,:,:],zvals[1][k,:,:]),cmap="jet",vmin=27.4,vmax=27.7)
@@ -1835,18 +1843,21 @@ def folderMap(runsdict,save=True):
     If = 334000
     C = model.coef_
     #W0 = (rho0*Cp)/(rhoi*If*C)
-    W0 =  325000#(rho0*Cp)/(rhoi*If*C)
+    W0 =  100000#(rho0*Cp)/(rhoi*If*C)
     alpha =  C/((rho0*Cp)/(rhoi*If*W0))
+    print("alpha:",alpha)
     oldxs=xs
     #xs= xs*(rho0*Cp)/(rhoi*If*325000)
     xs=model.predict(xs)
-    plt.text(.05, .95, '$r^2=$'+str(round(model.score(oldxs,ys),2)), ha='left', va='top', transform=plt.gca().transAxes,fontsize=12)
+    plt.text(.05, .95, '$r^2=$'+str(round(model.score(oldxs,ys),2)), ha='left', va='top', transform=plt.gca().transAxes,fontsize=18)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
 
-    plt.xlabel("$\dot{m}_{\mathrm{pred}}$",fontsize=18)
-    plt.ylabel("$\dot{m}_{\mathrm{model}}$",fontsize=18)
+    plt.xlabel("Melt rate predicted from theory (m/yr)",fontsize=18)
+    plt.ylabel("Diagnosed melt rate from simulation (m/yr)",fontsize=18)
     plt.plot(range(0,25),range(0,25),linestyle="dashed")
-    plt.xlim(0,25)
-    plt.ylim(0,25)
+    plt.xlim(0,20)
+    plt.ylim(0,20)
     for k in runsdict.keys():
         for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
             for l in range(len(runsdict[k]["specialstring"])):
@@ -1931,14 +1942,16 @@ runsdict = {\
         "reference":{"specialstring":["ref"], "marker":["p"] ,"color":["black"],"description":["more steep slope"]}\
         }
 
-generateRunsTable(runsdict)
+#generateRunsTable(runsdict)
 #legendFunction(runsdict)
+#crossSectionAnim("/home/garrett/Projects/MITgcm_ISC/experiments/widthexp-GLIB-explore-32/at0w250/results/","")
 
 #fastExplosionCheck(runsdict)
 #folderMapRefresh(runsdict)
 #folderMapTimeSeries(runsdict)
-#folderMap(runsdict)
-#folderMapMoreGeneric(crossAndMelt,runsdict)
+folderMap(runsdict)
+#folderMapGeneric(gprimeWidth,runsdict)
+plt.show()
 #plt.show()
 #crossSectionAverage("/home/garrett/Projects/MITgcm_ISC/experiments/reference/at125/results","Reference")
 #plt.show()
