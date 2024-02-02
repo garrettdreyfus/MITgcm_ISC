@@ -489,7 +489,8 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   %%% Bottom properties offshore, taken from Meijers et al. (2010)
   %%% measurements. We need these because the KN climatology only goes down
   %%% to 2000m
-  s_bot = 34.65;
+  %s_bot = 34.65;
+  s_bot = 35;
   pt_bot = -0.5;
   s_mid = 34.67;
   pt_mid = 1;
@@ -902,7 +903,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
           end
           Pressure = -rhoConst*g*zz(k);    
           rhoShelfIce = densmdjwf(sNorth(k),tNorth(k),Pressure/Pa1dbar);
-          SHELFICEloadAnomaly(i,j) = SHELFICEloadAnomaly(i,j) + (g*(rhoShelfIce-rhoConst)*dz(k));                
+          SHELFICEloadAnomaly(i,j) = SHELFICEloadAnomaly(i,j) + (g*(rhoShelfIce-rhoConst)*zz(k));                
          end
        end
     end
