@@ -11,8 +11,8 @@ function saltFluxTest()
   experiment_parameters.monitor_freq = 6;
   experiment_parameters.rng_seed = 10;
   experiment_parameters.random_amplitude = 300;
-  experiment_parameters.saltflux = true;
-  experiment_parameters.rbcs_temp = true;
+  experiment_parameters.saltflux = false;
+  experiment_parameters.rbcs_temp = false;
 
   currentFolder = pwd;
   experiment_parameters.tcline_atshelf_depth = bath+150;

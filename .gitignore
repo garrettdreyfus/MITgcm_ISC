@@ -1,3 +1,5 @@
 pics/
 experiments/
+utils/
+tools/
 analysis/*.mat

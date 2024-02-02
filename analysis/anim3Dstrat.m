@@ -8,11 +8,11 @@
 %%%
 
 %%% Select potential temperature surface
-theta_plot = 34.5;
+theta_plot = 0.4;
 
 %%% Select simulation
-expdir = '/home/garrett/Projects/MITgcm_ISC/experiments/reference';
-expname = 'PIG';
+%expdir = '/home/garrett/Projects/MITgcm_ISC/experiments/slope375-GLIB-explore-18';
+%expname = 'at125';
 %%% Read experiment data
 
 loadexp;
@@ -40,27 +40,27 @@ figlabel = '';
 M = moviein(nDumps);
   
 %%% Read snapshot
-for n=1:length(dumpIters)
+for n=5:length(dumpIters)
 % for n = 1
 
 %   uvel = rdmdsWrapper(fullfile(exppath,'/results/UVEL'),dumpIters(n));      
 %   vvel = rdmdsWrapper(fullfile(exppath,'/results/VVEL'),dumpIters(n));   
-  theta = rdmdsWrapper(fullfile(exppath,'/results/SALT'),dumpIters(n));         
+  theta = rdmdsWrapper(fullfile(exppath,'/results/THETA'),dumpIters(n));         
   tt =  (dumpIters(n)-dumpIters(1))*deltaT/86400
 
   %%% Load time-mean output
-  load(fullfile(prodir,[expname,'_tavg_5yrs.mat']),'PHIHYD');
-  pp = PHIHYD;
-  eta = pp(:,:,1)/gravity;
-  eta(:,1) = NaN;
-  eta(:,end) = NaN;
-  eta = eta - mean(eta(:,end-1));
+  %load(fullfile(prodir,[expname,'_tavg_5yrs.mat']),'PHIHYD');
+  %pp = PHIHYD;
+  %eta = pp(:,:,1)/gravity;
+  %eta(:,1) = NaN;
+  %eta(:,end) = NaN;
+  %%eta = eta - mean(eta(:,end-1));
 
   %%% Remove topography
   theta(hFacC==0) = NaN;
-  eta(hFacC(:,:,1)==0) = NaN;
+  %eta(hFacC(:,:,1)==0) = NaN;
 
-  figure(1);
+  fig = figure(1);
   clf;
   scrsz = get(0,'ScreenSize');
 %   set(gcf,'Position',[0.25*scrsz(3) 0.15*scrsz(4) 600 600]);
@@ -86,10 +86,34 @@ for n=1:length(dumpIters)
   [Y,X] = meshgrid(yy,xx);  
   % surf(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,bathy(:,2:end-1));
   p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,bathy(:,2:end-1));
-  alpha(p,0.3)
+  alpha(p,1)
   % p.FaceColor = [8*16+5 5*16+7 2*16+3]/255;
   p.FaceColor = [11*16+9 9*16+12 6*16+11]/255;
   p.EdgeColor = 'none';       
+
+  icedraft=SHELFICEtopo
+  icedraft_plot = icedraft;
+  icedraft_plot(icedraft==0) = NaN;
+  icetop_plot = 0*icedraft_plot;
+  for i=1:Nx
+    j = find(~isnan(icetop_plot(i,:)),1,'last');
+    if (isempty(j))
+      continue;
+    else
+      icetop_plot(i,j+1) = max(-200,bathy(i,j+1));
+    end
+  end
+ 
+  %%% Plot ice
+  hold on;
+  p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icedraft_plot(:,2:end-1));
+  p.FaceColor = [153, 255, 255]/255;
+  p.EdgeColor = 'none';
+  p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icetop_plot(:,2:end-1));
+  p.FaceColor = [153, 255, 255]/255;
+  p.EdgeColor = 'none';
+  hold off;
+
 
   hold on;
 
@@ -147,14 +171,17 @@ for n=1:length(dumpIters)
   fv = isosurface(XX(:,2:end-1,:),YY(:,2:end-1,:),ZZ(:,2:end-1,:),theta(:,2:end-1,:),theta_plot);
   p = patch(fv);
   % p.FaceColor = 'blue';
-  p.FaceColor = [79 66 181]/255;
+  p.FaceColor = [219 110 110]/255;
   p.EdgeColor = 'none';
   alpha(p,0.5);
 
+  save('grfpplot.mat','XX','YY','ZZ','theta','SHELFICEtopo','bathy')
+
   hold off;
+  %pause(1000)
 
   %%% Decorations
-  view(-15,15);
+%view(-195,180);
   axis tight;
   xlabel('x (km)','interpreter','latex');
   ylabel('y (km)','interpreter','latex');
@@ -181,15 +208,17 @@ for n=1:length(dumpIters)
   lightangle(0,15);
   lighting gouraud;
   
+  waitfor(fig);
   M(n) = getframe(gcf);
   
 end
 
 %%% Write as .mp4 file
-vw = VideoWriter('~/Projects/MITgcm_ISC/pics/AAC_AABW_3dsalt.mp4','Motion JPEG AVI');
+vw = VideoWriter('~/Projects/MITgcm_ISC/pics/theta200','Motion JPEG AVI');
 vw.FrameRate=10;
 open(vw);
 for m = M
   writeVideo(vw,m);
 end
 close(vw);
+

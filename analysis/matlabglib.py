@@ -132,16 +132,28 @@ def GLIBfromFile(fname,full=False):
     variables = scipy.io.loadmat(fname,variable_names=('h','icedraft'))
     icedraft = np.asarray(variables["icedraft"])
     h = np.asarray(variables["h"])
-    plt.imshow(h)
-    plt.show()
     icedraft[icedraft==0] = np.nan
     icedraft[h==0] = 0
     GLIB = generateBedmapGLIBs(h,icedraft)
     GLIB[np.asarray(GLIB-h)<10] = np.nan
+    #plt.imshow(GLIB)
+    #plt.show()
     if full:
         return GLIB
     else:
         return np.nanmean(GLIB[icedraft==np.nanmin(icedraft)])
+
+def aisfdepth(fname,full=False):
+    variables = scipy.io.loadmat(fname,variable_names=('h','icedraft'))
+    icedraft = np.asarray(variables["icedraft"])
+    h = np.asarray(variables["h"])
+    icedraftbd = bd(icedraft!=0)
+    #fig, (ax1,ax2) = plt.subplots(1,2)
+    #ax1.imshow(icedraft)
+    #ax2.imshow(np.logical_and(icedraftbd,np.logical_and(icedraft==0,h!=0)))
+    #ax2.imshow(h)
+    #plt.show()
+    return np.nanmean(h[np.logical_and(icedraftbd,np.logical_and(icedraft==0,h!=0))])
 
 def MSDfromFile(fname):
     print(fname)
@@ -182,41 +194,4 @@ def RdfromFile(fname):
 #plt.ylabel("Depth")
 #plt.show()
 
-#print("700",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at0d700/input/metaparameters.mat'))
-#print("500",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at0d500/input/metaparameters.mat'))
-print("inverse",GLIBfromFile('../experiments/inverse-GLIB-explore-32/d0at0/input/metaparameters.mat'))
-#print(375,GLIBfromFile('../experiments/slope375-GLIB-explore-18/at-125/input/metaparameters.mat'))
-
-#print("w50",GLIBfromFile('../experiments/widthexp-GLIB-explore-32/w50/input/metaparameters.mat'))
-#print("w100",GLIBfromFile('../experiments/widthexp-GLIB-explore-32/w100/input/metaparameters.mat'))
-#print("w250",GLIBfromFile('../experiments/widthexp-GLIB-explore-32/w250/input/metaparameters.mat'))
-
-#print("d200",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at125d200/input/metaparameters.mat'))
-#print("d400",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at125d400/input/metaparameters.mat'))
-#print("d800",GLIBfromFile('../experiments/shelfzexp-GLIB-explore-101/at125d800/input/metaparameters.mat'))
-
-#variables = scipy.io.loadmat('../experiments/GLIB-explore/under/input/metaparameters.mat',variable_names=('h','icedraft'))
-# variables = scipy.io.loadmat('../experiments/smallerslope-GLIB-explore-18/at-125/input/metaparameters.mat',variable_names=('h','icedraft'))
-# icedraft = np.asarray(variables["icedraft"])
-# h = np.asarray(variables["h"])
-# plt.imshow(h)
-# plt.show()
-# icedraft[icedraft==0] = np.nan
-# icedraft[h==0] = 0
-
-# plt.imshow(icedraft==np.nanmin(icedraft))
-# plt.show()
-
-
-# GLIB = generateBedmapGLIBs(h,icedraft)
-# #MSD = calcMSD(h,icedraft,-500)
-# #MSD = calcMSD(h,icedraft,-200)
-
-# randomcmap = matplotlib.colors.ListedColormap(np.random.rand ( 256,3))
-# GLIB[np.asarray(GLIB-h)<10] = np.nan
-# print(np.nanmean(GLIB[icedraft==np.nanmin(icedraft)]))
-# plt.imshow(GLIB,cmap="jet")#,cmap=randomcmap)
-# plt.colorbar()
-
-# plt.show()
 

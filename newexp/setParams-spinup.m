@@ -23,7 +23,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   %%%%%%%%%%%%%%%%%%      
   
   %%% If set true, plots of prescribed variables will be shown
-  showplots = false;      
+  showplots = true;      
   fignum = 1;
   fontsize = 12;
   
@@ -97,6 +97,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
 %   viscAh = 12;       %%%%% Update: 20210630
 %   viscA4Grid = 0.1;  %%%%% Update: 20210630
 
+  ALLOW_3D_DIFFKR = true;
   
   
   %%% Topographic parameters 
@@ -251,7 +252,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   parm03.addParm('pChkptFreq',t1year/3,PARM_REAL); % permanent
   parm03.addParm('taveFreq',0,PARM_REAL); % it only works properly, if taveFreq is a multiple of the time step deltaT (or deltaTclock).
   parm03.addParm('dumpFreq',0,PARM_REAL); % interval to write model state/snapshot data (s)
-  parm03.addParm('monitorFreq',(t1year/12.0)*experiment_parameters.monitor_freq,PARM_REAL); % interval to write monitor output (s)
+  parm03.addParm('monitorFreq',t1year*0.5,PARM_REAL); % interval to write monitor output (s)
   parm03.addParm('dumpInitAndLast',true,PARM_BOOL);
   parm03.addParm('pickupStrictlyMatch',false,PARM_BOOL); 
   
@@ -425,10 +426,6 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   Hmin = 50;
   wct = icedraft - h;
   h(wct < Hmin) = icedraft(wct < Hmin);
-
-  save("temptopo.mat","h","icedraft")
-  [status,cmdout] = system("python matlabglib.py temptopo.mat");
-  HUB = str2num(cmdout);
   
   
   %%% Plot bathymetry and ice draft
@@ -455,27 +452,25 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   end
  
   %%% Plot ice
-  if (showplots)
-      hold on;
-      p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icedraft_plot(:,2:end-1));
-      p.FaceColor = [153, 255, 255]/255;
-      p.EdgeColor = 'none';
-      p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icetop_plot(:,2:end-1));
-      p.FaceColor = [153, 255, 255]/255;
-      p.EdgeColor = 'none';
-      hold off;
+  hold on;
+  p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icedraft_plot(:,2:end-1));
+  p.FaceColor = [153, 255, 255]/255;
+  p.EdgeColor = 'none';
+  p = surface(X(:,2:end-1)/1000,Y(:,2:end-1)/1000,icetop_plot(:,2:end-1));
+  p.FaceColor = [153, 255, 255]/255;
+  p.EdgeColor = 'none';
+  hold off;
 
-      %%% Decorations
-      view(-206,14);
-      axis tight;
-      xlabel('x (km)','interpreter','latex');
-      ylabel('y (km)','interpreter','latex');
-      zlabel('z (m)','interpreter','latex');
-      pbaspect([Lx/Ly 1 1]);
-      camlight('headlight');
-      lightangle(-206,34);
-      lighting gouraud;
-  end
+  %%% Decorations
+  view(-206,14);
+  axis tight;
+  xlabel('x (km)','interpreter','latex');
+  ylabel('y (km)','interpreter','latex');
+  zlabel('z (m)','interpreter','latex');
+  pbaspect([Lx/Ly 1 1]);
+  camlight('headlight');
+  lightangle(-206,34);
+  lighting gouraud;
   
   %%% Save as a parameter
   writeDataset(h,fullfile(inputpath,'bathyFile.bin'),ieee,prec);
@@ -495,7 +490,9 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   %%% Bottom properties offshore, taken from Meijers et al. (2010)
   %%% measurements. We need these because the KN climatology only goes down
   %%% to 2000m
+  %s_bot = 34.7;
   s_bot = 34.65;
+  %s_bot = 37;
   pt_bot = -0.5;
   s_mid = 34.67;
   pt_mid = 1;
@@ -506,8 +503,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   % at -1000
   % at -1500
   
-  Zcdw_pt_shelf = HUB+experiment_parameters.tcline_atshelf_depth; %%% CDW depth over the shelf
-
+  Zcdw_pt_shelf = experiment_parameters.tcline_atshelf_depth; %%% CDW depth over the shelf
   Zcdw_pt_South = Zcdw_pt_shelf + experiment_parameters.tcline_deltaz; %%% CDW depth at the southern boundary
 
   lat_Zcdw_pt = [0 Yshelfbreak Ydeep Ly];
@@ -599,7 +595,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   uEast = uEast_TWV;
 
   %%% Plot the relaxation temperature
-  if (showplots)
+  if (showplots || true)
 
     figure(fignum);
     fignum = fignum + 1;
@@ -792,6 +788,34 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
     end
   end
 
+  if(ALLOW_3D_DIFFKR)
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      %%%%% VERTICAL DIFFUSIVITY %%%%%
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+      %%% If a diffusive layer is required in the north to represent the
+      %%% northern basin, set the diffusivity here
+      diffKr = diffKrT*zeros(Nx,Ny,Nr);
+      for i=1:Nx
+        for j=1:Ny
+            if icedraft(i,j)
+                draftdiff = zz-icedraft(i,j);
+                draftdiff(draftdiff>0)=-Inf;
+                [c,k] = max(draftdiff);
+                %diffKr(i,j,k) = 0.2;
+                diffKr(i,j,k+1) = 0.005;
+            end
+        end
+      end
+      size(diffKr(100,:,:))
+      pcolor(squeeze(diffKr(100,:,:)))
+      writeDataset(diffKr,fullfile(inputpath,'diffKrFile.bin'),ieee,prec);
+      parm05.addParm('diffKrFile','diffKrFile.bin',PARM_STR);
+
+  end
+
+
   %%for ix=1:Nx
       %for iy=1:Ny
               %if yy(iy) < Yicefront
@@ -920,7 +944,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
           end
           Pressure = -rhoConst*g*zz(k);    
           rhoShelfIce = densmdjwf(sNorth(k),tNorth(k),Pressure/Pa1dbar);
-          SHELFICEloadAnomaly(i,j) = SHELFICEloadAnomaly(i,j) + (g*(rhoShelfIce-rhoConst)*zz(k));                
+          SHELFICEloadAnomaly(i,j) = SHELFICEloadAnomaly(i,j) + (g*(rhoShelfIce-rhoConst)*dz(k));                
          end
        end
     end
@@ -1453,6 +1477,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
                      %'KPPnuddt','KPPnudds','KPPRi','KPPdbloc','KPPshsq','KPPg_TH','KPPg_SLT'};%%% Basic state 
 
   diag_fields_avg = {'SHIfwFlx','SHIhtFlx','SHIForcT','SHIForcS','SALT','THETA','momKE','RHOAnoma','LaVH2TH','LaHs2TH','LaUH1RHO','LaHw1RHO','LaTr1RHO','LaUH2TH','LaHw2TH','LaVH1RHO','LaHs1RHO',...
+                     'DFrE_TH','DFrI_TH','DFrE_SLT','DFrI_SLT','KPPdiffT','KPPdiffS',...
 		     'UVEL','VVEL','WVEL','PHIHYD','ETAN','MXLDEPTH'};%%% Basic state 
   % % %      'TOTTTEND','TFLUX','ADVy_TH','VVELTH','oceQnet',...%%% Heat budget
   % % %      'UVELSQ','VVELSQ','WVELSQ','UV_VEL_Z','WU_VEL','WV_VEL',...%%% Energy budget
@@ -1496,8 +1521,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   % % % % % %          'Vm_Diss','Vm_Advec','Vm_Cori','Vm_dPhiY','Vm_Ext','Vm_AdvZ3','Vm_AdvRe',...
   % % % % % %          'VISrI_Um','VISrI_Vm',...
   numdiags_avg = length(diag_fields_avg);  
-  diag_freq_avg = (t1year/12.0)*experiment_parameters.monitor_freq;
-
+  diag_freq_avg = 0.5*t1year;
 
   diag_phase_avg = 0;    
       
@@ -1520,11 +1544,10 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
   %%   'SIarea','SIheff','SIuice','SIvice' ...
   %%     };
   diag_fields_inst = {...
-    'UVEL','VVEL','WVEL','THETA','SALT','ETAN','SHIfwFlx'};
-
+    'UVEL','VVEL','WVEL','THETA','SALT','ETAN','SHIfwFlx','DFrE_TH','DFrI_TH','DFrE_SLT','DFrI_SLT',};
 
   numdiags_inst = length(diag_fields_inst);  
-  diag_freq_inst = (t1year/12.0)*experiment_parameters.monitor_freq;
+  diag_freq_inst = t1year*0.5;
 %   diag_freq_inst = 7*t1day;
   diag_phase_inst = 0;
   
