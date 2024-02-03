@@ -2,7 +2,7 @@ function inverseSlopeTest()
   %% Depth at this seed is 465
   experiment_parameters = struct;
   experiment_parameters.tcline_deltaz = 100;
-  experiment_parameters.shelf_depth = 900;
+  experiment_parameters.shelf_depth = 700;
   experiment_parameters.trough_depth = 0;
   experiment_parameters.rand_topo = true;
   experiment_parameters.monitor_freq = 1;
