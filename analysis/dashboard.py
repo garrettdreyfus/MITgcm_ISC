@@ -37,7 +37,6 @@ def timeSeries(fname,refresh=False):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     ds = open_mdsdataset(fname,prefix=["THETA","SALT","momKE","SHIfwFlx","VVEL","UVEL","WVEL","RHOAnoma"],ignore_unknown_vars=True,iters=times,extra_variables = extra_variables)
-    totalvolume  = 1#(ds.XC.diff("x")*ds.YC.diff("y")*ds.Z.diff("z")*ds.hFacC).sum().values
     ## theta plot
     ts = ds.time.values*grabDeltaT(fname)/60.0/60.0/24.0/365.0
     tsnew = np.full_like(ts,0,dtype=float)
@@ -157,15 +156,6 @@ def intTemp(depth,fname):
     result = ((result/min(25,abs(depth))))
     return result
 
-def maxTemp(depth,fname):
-    variables = grabMatVars(fname,('tNorth','tEast','zz',''))
-    tEast = np.asarray(variables["tEast"])#[0]+1.8
-    zz = np.asarray(variables["zz"])[0]
-    tEast = tEast[int(tEast.shape[0]-1)]+1.8
-    return zz[np.argmax(tEast)]
-
-
-
 def slope(zglib,fname):
     variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft','tEast','zz','yy',"xx","Yicefront"))
     zpyc = np.asarray(variables["Zcdw_pt_shelf"])[0][0]
@@ -195,70 +185,6 @@ def volume(fname):
     grad = np.sqrt(np.sum(grad,axis=0))
 
     return np.nanmedian(grad[np.logical_and(icedraft!=0,diff!=0)])#np.mean(diff[np.logical_and(icedraft!=0,diff!=0)]) #+ abs(zglib-zgl)/y
-
-def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o",title=""):
-    ((ax1,ax2),(ax3,ax4)) = axises 
-    data = timeSeries(fname)
-    glib = GLIBfromFile(matVarsFile(fname))
-    aisf = aisfdepth(matVarsFile(fname))
-    #xval =0 
-    for k in data.keys():
-        if k != "ts":
-            try:
-                data[k] = np.nanmean(data[k][data["ts"]>5])
-            except:
-                data[k]=np.nan
-    if "gprime" not in data.keys():
-        data["gprime"] = np.nan
-    variables = grabMatVars(fname,("Hshelf","Xeast","Xwest","randtopog_height","Yicefront","Zcdw_pt_South","tEast","sEast","icedraft","zz"))
-    y = np.asarray(variables["Yicefront"])[0][0]
-    icedraft = np.asarray(variables["icedraft"])
-
-    lightdens = dens(np.asarray(data["icesurfacesalt"]),np.asarray(data["icesurfacetemp"]),0)
-    zz = np.asarray(variables["zz"])[0]
-    tNorth = np.asarray(variables["tEast"])[-1,:]
-    sNorth = np.asarray(variables["sEast"])[-1,:]
-    zgl = np.nanmin(icedraft)
-
-    aisfxval = intTemp(aisf,fname)
-    glibxval = intTemp(glib,fname)
-    ices,beds = slope(aisf,fname)
-    ices = volume(fname)
-
-    #glibxval = iceFaceTemp(glib,fname)
-
-    shelf_depth = variables["Hshelf"]
-    shelf_width = variables["Xeast"]-variables["Xwest"]
-    randtopog_height = variables["randtopog_height"]
-    max_height = variables["Zcdw_pt_South"][0][0]
-    #ax1.scatter(shelf_width,lightdens,c=color,marker=marker)
-    #ax1.set_xlabel("Cavity Width AKA Lx")
-    #ax1.set_ylabel("sigma0 at ice interface")
-    ## salt plot
-    ax2.scatter(shelf_width,data["gprime"],c=color,marker=marker)
-    ax2.set_xlabel("")
-    ax2.set_ylabel("")
-    deltaH = ((((max_height-75)/2.0+75) - glib))
-    tcline_height = (max_height-75)/2.0+75
-    ax3.scatter(aisfxval*np.abs(aisfxval)*ices,-data["shiflx"],c=color,marker=marker)
-    ax3.set_xlabel("(off shore t at aisf) * (thermocline height above aisf)")
-    ax3.set_ylabel("Melt Rate m/yr")
-    
-    #ax4.scatter(glib,-data["shiflx"],c=color,marker=marker)
-    zpyci = np.argmin(np.abs(np.abs(zz)-abs(tcline_height)))
-    glibi = np.argmin(np.abs(np.abs(zz)-abs(glib)))
-    localdens = dens(sNorth,tNorth,abs(0))
-    drhodz = np.diff(localdens)/np.diff(zz)
-    zpyc = np.nanmean(zz[1:][drhodz>np.nanquantile(drhodz,0.90)])
-    zpyci = np.nanargmin(np.abs(np.abs(zz)-abs(zpyc)))
-    #gprime = (localdens[zpyci-10] - localdens[zpyci+10])/(zz[zpyci-10] - zz[zpyci+10])
-    gprime = 9.8*(np.mean(localdens[zpyci:glibi])-np.mean(localdens[:zpyci]))/np.mean(localdens[:glibi])
-    ax1.scatter(gprime*shelf_width,data["gprime"],c=color,marker=marker)
-    #print(gprime)
-    ax4.scatter((glibxval)*ices*(deltaH)*gprime,-data["shiflx"],c=color,marker=marker)
-    #ax4.scatter((glibxval)*tcline_height*ices,-data["shiflx"],c=color,marker=marker)
-    ax4.set_xlabel("(off shore t at hub) * (thermocline height above hub)")
-    ax4.set_ylabel("Melt Rate m/yr")
 
 def FStheory(fname,xval):
     data = timeSeries(fname)
@@ -313,8 +239,10 @@ def FStheory(fname,xval):
         rho_2 = np.nanmean(d[mldi:min(mldi*2,len(d)-1)])
         gprime_ext = 9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2))
     #gprime_ext = 9.8*(np.mean(localdens[zpyci:min(zpyci+10,len(localdens)-1)])-np.mean(localdens[max(0,zpyci-10):zpyci]))/np.mean(localdens[:min(zpyci*2,len(localdens)-1)])
-    rho_1i = np.logical_and(zz<zz[zpyci],zz>zz[zpyci]-zpyci)
-    rho_2i = np.logical_and(zz<zz[zpyci]+zpyci,zz>zz[zpyci])
+    print(zpyci)
+    rho_1i = np.logical_and(zz<zz[zpyci],zz>zz[zpyci]-30)
+    rho_2i = np.logical_and(zz<zz[zpyci]+30,zz>zz[zpyci])
+
     print(rho_1i)
     print(rho_2i)
     gprime_ext = 9.8*(np.mean(localdens[rho_1i])-np.mean(localdens[rho_2i]))/np.mean(localdens[np.logical_or(rho_1i,rho_2i)])
@@ -575,59 +503,6 @@ def bottomspinup(fname,description,times=np.array([])):
 
     plt.show()
 
-
-def someotherfunc():
-    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
-    times=getIterNums(fname)
-    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
-    bmask = bottomMask(fname,ds)
-    icem = icemask(fname,ds)
-    shortname, fpath = outPath(fname) 
-    fig,((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2)
-    theta = ds.THETA.values
-    uvel = ds.UVEL.values
-    vvel = ds.VVEL.values
-    wvel = ds.WVEL.values
-    mask = np.full_like(uvel[0,0],1,dtype=bool)
-    mask[::4,::4] = 0
-    shifwflx = ds.SHIfwFlx.values
-
-    X,Y = np.meshgrid(range(uvel.shape[2]),range(uvel.shape[3]))
-
-    for k in tqdm(range(int(ds.UVEL.values.shape[0]))):
-        thetak = theta[k]
-        thetabot = thetak *bmask
-        thetabot[~bmask] = np.nan
-        thetabot = np.nanmean(thetabot,axis=0)
-        utop =  np.nanmean(uvel[k] * icem,axis=0)
-        vtop =  np.nanmean(vvel[k] * icem,axis=0)
-        wtop =  np.nanmean(wvel[k] * icem,axis=0)
-        frame = ax1.pcolormesh(utop)
-        if k==1:
-            cb = plt.colorbar(frame,ax=ax1,pad=0.1)
-        #ax1.quiver(ubot,vbot,scale=1.5)
-
-        thetatop = thetak *icem
-        thetatop[~icem] = np.nan
-        thetatop = np.nanmean(thetatop,axis=0)+1.8
-        frame = ax2.pcolormesh(thetatop)
-        if k==1:
-            cb = plt.colorbar(frame,ax=ax2,pad=0.1)
-
-        ax3.pcolormesh((thetatop**1)*np.sqrt(utop**2+vtop**2+wtop**2))
-        ax4.pcolormesh(-shifwflx[k])
-        plt.show()
-        
-    vals = grabMatVars(fname,("h","icedraft"))
-    h = np.abs(np.asarray(vals["h"]))
-    Znew = np.zeros(ds.THETA.shape[1:])
-    for l in range(Znew.shape[0]):
-        Znew[l,:,:]=ds.Z.values[l]
-    bottom_dist = Znew-(-h.T)
-    return np.logical_and(bottom_dist < 50,bottom_dist>0)
-
-
-    
 def outPath(resultspath):
     nameparts = resultspath.split("/")
     shortname = nameparts[-3] + "|" + nameparts[-2]
@@ -1958,7 +1833,6 @@ plt.show()
 #circulationFigure("/home/garrett/Projects/MITgcm_ISC/experiments/reference/at125/results","Reference")
 #plt.show()
 
-######FIX ITERNUMS PROBLEM
 #folderMapGeneric(steadyStateAverageSimple,runsdict)
 #folderMapGeneric(gprimeWidth,runsdict)
 #folderMapGeneric(saltBudget,runsdict)
