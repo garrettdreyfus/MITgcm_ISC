@@ -3,8 +3,7 @@ import glob
 from xmitgcm import open_mdsdataset
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import numpy.matlib 
-import matplotlib.pyplot as plt
-import matplotlib
+import matplotlib.pyplot as plt,matplotlib
 import cmocean
 from matplotlib.animation import FFMpegFileWriter
 from sklearn.linear_model import LinearRegression
@@ -37,7 +36,6 @@ def timeSeries(fname,refresh=False):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     ds = open_mdsdataset(fname,prefix=["THETA","SALT","momKE","SHIfwFlx","VVEL","UVEL","WVEL","RHOAnoma"],ignore_unknown_vars=True,iters=times,extra_variables = extra_variables)
-    totalvolume  = 1#(ds.XC.diff("x")*ds.YC.diff("y")*ds.Z.diff("z")*ds.hFacC).sum().values
     ## theta plot
     ts = ds.time.values*grabDeltaT(fname)/60.0/60.0/24.0/365.0
     tsnew = np.full_like(ts,0,dtype=float)
@@ -166,35 +164,29 @@ def maxTemp(depth,fname):
 
 
 
-def slope(zglib,fname):
-    variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft','tEast','zz','yy',"xx","Yicefront"))
-    zpyc = np.asarray(variables["Zcdw_pt_shelf"])[0][0]
-    yy = np.asarray(variables["yy"])[0]
-    xx = np.asarray(variables["xx"])[0]
-    XX,YY = np.meshgrid(xx,yy)
-    y = np.asarray(variables["Yicefront"])[0][0]
-    icedraft = np.asarray(variables["icedraft"])
-    zgl = np.nanmin(icedraft)-np.nanmax(icedraft[icedraft!=0])
-    return (abs(zgl)-200)/y , abs(zglib-zgl)/y
+def slope(fname,method="grad"):
+    if method == "param":
+        variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft','tEast','zz','yy',"xx","Yicefront"))
+        y = np.asarray(variables["Yicefront"])[0][0]
+        icedraft = np.asarray(variables["icedraft"])
+        zgl = np.nanmin(icedraft)-np.nanmax(icedraft[icedraft!=0])
+        return (abs(zgl)-200)/y
 
-def volume(fname):
-    variables = grabMatVars(fname,('icedraft',"h","YY","xx","yy","Yicefront"))
-    icedraft = np.asarray(variables["icedraft"])
-    h = np.asarray(variables["h"])
-    YY = np.asarray(variables["YY"])
-    yy = np.asarray(variables["yy"])[0]
-    xx = np.asarray(variables["xx"])[0]
-    XX,YY = np.meshgrid(xx,yy)
-    diff = np.abs(h)-np.abs(icedraft)
-    zgl = np.nanmin(icedraft)
-    y = np.asarray(variables["Yicefront"])[0][0] - np.nanmin(YY.T[diff>0])
-    grad = np.gradient(icedraft)
-    grad[0] = (grad[0]/np.gradient(xx)[10])**2
-    grad[1] = (grad[1]/np.gradient(yy)[10])**2
-    #grad = np.sqrt(grad[0] + grad[1])
-    grad = np.sqrt(np.sum(grad,axis=0))
+    if method == "grad":
+        variables = grabMatVars(fname,('icedraft',"h","YY","xx","yy","Yicefront"))
+        icedraft = np.asarray(variables["icedraft"])
+        h = np.asarray(variables["h"])
+        YY = np.asarray(variables["YY"])
+        yy = np.asarray(variables["yy"])[0]
+        xx = np.asarray(variables["xx"])[0]
+        diff = np.abs(h)-np.abs(icedraft)
+        grad = np.gradient(icedraft)
+        grad[0] = (grad[0]/np.gradient(xx)[10])**2
+        grad[1] = (grad[1]/np.gradient(yy)[10])**2
+        #grad = np.sqrt(grad[0] + grad[1])
+        grad = np.sqrt(np.sum(grad,axis=0))
 
-    return np.nanmedian(grad[np.logical_and(icedraft!=0,diff!=0)])#np.mean(diff[np.logical_and(icedraft!=0,diff!=0)]) #+ abs(zglib-zgl)/y
+        return np.nanmedian(grad[np.logical_and(icedraft!=0,diff!=0)])#np.mean(diff[np.logical_and(icedraft!=0,diff!=0)]) #+ abs(zglib-zgl)/y
 
 def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o",title=""):
     ((ax1,ax2),(ax3,ax4)) = axises 
@@ -222,8 +214,7 @@ def steadyStateAverage(fname,xval,fig,axises,color="blue",marker="o",title=""):
 
     aisfxval = intTemp(aisf,fname)
     glibxval = intTemp(glib,fname)
-    ices,beds = slope(aisf,fname)
-    ices = volume(fname)
+    ices = slope(fname)
 
     #glibxval = iceFaceTemp(glib,fname)
 
@@ -287,8 +278,7 @@ def FStheory(fname,xval):
     shelf_width = float(variables["Xeast"])-float(variables["Xwest"])
     aisfxval = intTemp(aisf,fname)
     glibxval = intTemp(glib,fname)
-    ices,beds = slope(aisf,fname)
-    ices = volume(fname)
+    ices = slope(fname)
     max_height = variables["Zcdw_pt_shelf"][0][0]
     tcline_height = (max_height-75)/2.0+75
     localdens = dens(sNorth,tNorth,abs(0))
@@ -1586,7 +1576,7 @@ def crossSectionAverage(fname,description,quant="THETA",res=1,dim="zonal",ax1=No
 
     variables = grabMatVars(fname,("Xeast","Xwest","Yicefront"))
     yice = float(variables["Yicefront"])/1000
-    ices = volume(fname)
+    ices = slope(fname)
     C=(-.205)-yice*ices
     y = np.array([[0.05,0], [0.05,0.05*ices+C], [yice + 0.8,-.205-0.1], [yice + 0.8,0], [0.05,0]])
     p = Polygon(y, facecolor = '#8addf9',zorder=4)
