@@ -4,18 +4,24 @@ import numpy as np
 from jmd95 import dens
 from scipy.integrate import quad
 
+## Get temperature at depth)
 def intTemp(depth,fname):
     variables = grabMatVars(fname,('tNorth','tEast','zz',''))
+    ## forcing temperature along eastern boundary
     tEast = np.asarray(variables["tEast"])#[0]+1.8
     zz = np.asarray(variables["zz"])[0]
+    ## forcing temperature at north eastern end of domain
     tEast = tEast[int(tEast.shape[0]-1)]+1.8
     f_interp = lambda xx: np.interp(xx, zz[::-1], tEast[::-1])
     results = []
     ls = []
+    ## integrate and average temperature 25 meters above hub depth
     result = quad(f_interp,depth,min(depth+25,0), points = zz[::-1])[0]
     result = ((result/min(25,abs(depth))))
     return result
 
+## Calculates slope of ice shelf from either the model parameters (param option) or from a point on the ice shelf
+    # the ice shelf is linear so these methods are identical
 def slope(fname,method="grad"):
     if method == "param":
         variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft','tEast','zz','yy',"xx","Yicefront"))
@@ -39,71 +45,69 @@ def slope(fname,method="grad"):
         return np.nanmedian(grad[np.logical_and(icedraft!=0,diff!=0)])#np.mean(diff[np.logical_and(icedraft!=0,diff!=0)]) #+ abs(zglib-zgl)/y
 
 def FStheory(fname,xval):
-    data = timeSeries(fname)
-    glib = GLIBfromFile(matVarsFile(fname))
-    #xval =0 
 
+    #pull in timeseries data for returning the diagnosed meltrate 
+    data = timeSeries(fname)
+
+    #Calculate HUB from model setup file
+    hub = GLIBfromFile(matVarsFile(fname))
+
+    #We care about the mean of the model output
     for k in data.keys():
         if k != "ts":
             try:
                 data[k] = np.nanmean(data[k][data["ts"]>2.5])
             except:
                 data[k]=np.nan
-    if "gprime" not in data.keys():
-        data["gprime"] = np.nan
 
+    ##Pull in relevant geometric parameters and hydrographic forcings
     variables = grabMatVars(fname,("Hshelf","Xeast","Xwest","randtopog_height","Yicefront","Zcdw_pt_South","Zcdw_pt_shelf","tEast","sEast","icedraft","zz","h","yy","xx"))
     icedraft = np.asarray(variables["icedraft"])
     h = np.asarray(variables["h"])
     #
+    ##Temperature and salinity at the northern boundary
     tNorth = np.asarray(variables["tEast"])[-1,:]
     sNorth = np.asarray(variables["sEast"])[-1,:]
-    rho0 = dens(sNorth,tNorth,500)
+
+    ## crude but accurate way to calculate the grounding line depth
     zgl = np.nanmin(icedraft)
 
+
     shelf_width = float(variables["Xeast"])-float(variables["Xwest"])
-    glibxval = intTemp(glib,fname)
+
+    ## Grab temperature at HUB depth
+    Tcdw = intTemp(hub,fname)
+
+    ## ice shelf slope
     ices = slope(fname)
-    max_height = variables["Zcdw_pt_shelf"][0][0]
-    tcline_height = (max_height-75)/2.0+75
+    #density using model density function
     localdens = dens(sNorth,tNorth,abs(0))
     zz = np.asarray(variables["zz"])[0]
-    #zpyci = np.argmax(np.abs(np.diff(localdens)/np.diff(zz)))
+    ## density gradient
     gradd = np.abs(np.diff(localdens)/np.diff(zz))
-    
+    #average depth of all above 80th percentile
     tcline_height=np.mean(zz[:-1][gradd>np.quantile(gradd,0.8)])#+75
     zpyci = np.argmin(np.abs(np.abs(zz)-abs(tcline_height)))
-    #plt.plot(localdens,zz)
-    #plt.axhline(y=tcline_height)
-    #plt.axhline(y=(max_height-75)/2.0+75,color="red")
-    #plt.show()
-    #gprime_ext = 9.8*(np.mean(localdens[zpyci:])-np.mean(localdens[:min(zpyci*2,len(localdens)-1)]))/np.mean(localdens)
-    #gprime_ext = 9.8*(np.mean(localdens[zpyci:min(zpyci*2,len(localdens)-1)])-np.mean(localdens[:zpyci]))/np.mean(localdens[:min(zpyci*2,len(localdens)-1)])
-    d = localdens
-    if np.sum(d-d[0]>0.03)>0:#and np.sum(t>0.5)>0:
-        mldi = np.where(d-d[0]>0.03)[0][0]
 
-        #cdwi = np.where(t>0)[0][0]
-        rho_1 = np.nanmean(d[:mldi])
-        rho_2 = np.nanmean(d[mldi:min(mldi*2,len(d)-1)])
-        gprime_ext = 9.8*(rho_2-rho_1)/np.mean((rho_1,rho_2))
-    #gprime_ext = 9.8*(np.mean(localdens[zpyci:min(zpyci+10,len(localdens)-1)])-np.mean(localdens[max(0,zpyci-10):zpyci]))/np.mean(localdens[:min(zpyci*2,len(localdens)-1)])
+    ## calculation of gprime
     rho_1i = np.logical_and(zz<zz[zpyci],zz>zz[zpyci]-30)
     rho_2i = np.logical_and(zz<zz[zpyci]+30,zz>zz[zpyci])
-
     gprime_ext = 9.8*(np.mean(localdens[rho_1i])-np.mean(localdens[rho_2i]))/np.mean(localdens[np.logical_or(rho_1i,rho_2i)])
 
-    deltaH = -(abs(tcline_height)- abs(glib))
+    deltaH = -(abs(tcline_height)- abs(hub))
     if "reference" in fname and "at125" in fname:
         print(tcline_height)
 
+
+    # f is defined in the model setup
     f = 1.3*10**-4
     rho0 = 1025
     rhoi = 910
     Cp = 4186
     If = 334000
-    return (glibxval)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365)
+    return (Tcdw)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365)
 
+#condstructing depth from depth differences
 def depthFromdZ(ds):
     U = ds.UVEL.values[0,:,:,:]
     fZ = list(ds.Z)
@@ -116,6 +120,7 @@ def depthFromdZ(ds):
     zmask = z
     return np.sum(zmask*Z,axis=0)
 
+#Slightly grotesque way to get grid cells closest to topography. Only used for graphing.
 def bottomMask(fname,ds,thresh=10):
     vals = grabMatVars(fname,("h","icedraft"))
     h = np.abs(np.asarray(vals["h"]))
@@ -125,6 +130,7 @@ def bottomMask(fname,ds,thresh=10):
     bottom_dist = Znew-(-h.T)
     return np.logical_and(np.logical_and(bottom_dist < 50,bottom_dist>0),ds.hFacC.values>0)
 
+#Slightly grotesque way to get grid cells closest to ice. Only used for graphing.
 def icemask(fname,ds,thresh=10):
     vals = grabMatVars(fname,("h","icedraft"))
     icedraft = np.abs(np.asarray(vals["icedraft"]))
@@ -188,23 +194,11 @@ def mixedLayerQuant(ds,fname):
                         velmagcdw = np.nanmean(np.sqrt(u[mldi:max(mldi*2,len(t)-1)]**2+v[mldi:max(mldi*2,len(t)-1)]**2))
                         velmagsurf = np.nanmean(np.sqrt(u[:mldi]**2+v[:mldi]**2))
                         
-                        froude_map[y_index,x_index]= np.nanmean(np.diff(d)/np.diff(Z))#Z[0]-Z[-1]#np.sqrt((velmagcdw/np.sqrt(gprimes_t[-1]*np.ptp(Z[mldi:max(mldi*2,len(t)-1)])))**2 + (velmagsurf/np.sqrt(gprimes_t[-1]*np.ptp(Z[:mldi+1])))**2)
-                        #froude_map[y_index,x_index]= np.ptp(Z)
-
-        #print(fname)
-        #plt.imshow(froude_map,vmin=0,vmax=1,cmap="jet")
-        #plt.pcolormesh(ds.XC.values,ds.YC.values,froude_map,cmap="jet")
-        #plt.colorbar()
-        #plt.show()
-        #froudes.append(np.nanmean(froude_map))
-
         gprimes.append(np.nanmean(gprimes_t))
         ssurf.append(np.nanmean(ssurf_t))
         scdw.append(np.nanmean(scdw_t))
         tsurf.append(np.nanmean(tsurf_t))
         tcdw.append(np.nanmean(tcdw_t))
-    #plt.imshow(gprimemap)
-    #plt.show()
     return gprimes,ssurf,scdw,tsurf,tcdw,froudes#,froudesurf,froudecdw
 
 
