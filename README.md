@@ -8,4 +8,4 @@ The code for creating the MITgcm runs is in the newexp and newexp\_utils folders
 The analysis and graphing code is contained in the analysis folder.
 
 
-If you are interested in running or even reading the software please reach out to me at gdf@ucla.edu it would make my day!
+If you are interested in running or just have questions reading the software please reach out to me at gdf@ucla.edu it would make my day!
