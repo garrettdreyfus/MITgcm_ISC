@@ -2,6 +2,9 @@ import os, pickle, glob
 from scipy.io import loadmat
 import numpy as np
 from xmitgcm import open_mdsdataset
+from pathlib import Path
+import re
+
 
 
 def timeSeries(fname,refresh=False):

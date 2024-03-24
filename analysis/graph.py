@@ -4,8 +4,10 @@ import xarray as xr
 import glob
 from sklearn.linear_model import LinearRegression
 from analysis import FStheory
-from datainput import timeSeries, matVarsFile
+from datainput import timeSeries, matVarsFile, getIterNums, grabDeltaT
+from xmitgcm import open_mdsdataset
 from matlabglib import GLIBfromFile
+import cmocean
 
 def barotropic_streamfunction_max(fname,times=np.array([]),res=1):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
@@ -678,6 +680,7 @@ def circulationFigure(fname,description,times=np.array([])):
     plt.quiver(X[::5,::5],Y[::5,::5],interfaceu[::5,::5],interfacev[::5,::5],color="white")
 
     plt.gca().tick_params(labelsize=15)
+    print(glib)
     plt.contour(xs,ys,bottomz[:,::-1],[glib-25],colors=["red"],linewidths=4)
     plt.ylabel(r'x (km)',fontsize=18)
     plt.xlabel(r'y (km)',fontsize=18)
@@ -1001,13 +1004,17 @@ def surfaceAnim(fname,description,times=np.array([]),quant="SALT"):
 def folderMap(runsdict,save=True):
     fig,axises = plt.subplots(1,1,figsize=(8,7))
     xs,ys,eyeds = [],[],{}
+    stats = {"deltaH":[],"Tcdw":[],"gprime":[],"ices":[]}
+    statscounter = 0
     for k in runsdict.keys():
         for f in glob.glob(str("/home/garrett/Projects/MITgcm_ISC/experiments/"+k+"/*"), recursive = True):
             for l in range(len(runsdict[k]["specialstring"])):
                 key=runsdict[k]["specialstring"][l]
                 if key and key in f:
                     try:
-                        x,y=FStheory(f+"/results",None)
+                        x,y,newstats=FStheory(f+"/results",None,True)
+                        for j in newstats.keys():
+                            stats[j].append(newstats[j])
                         if ~np.isnan(y):
                             xs.append(x)
                             ys.append(y)
@@ -1016,13 +1023,17 @@ def folderMap(runsdict,save=True):
                         print("yeesh")
                 elif not key:
                     try:
-                        x,y=FStheory(f+"/results",None)
+                        x,y,newstats=FStheory(f+"/results",None,true)
+                        for j in newstats.keys():
+                            stats[j].append(newstats[j])
                         if ~np.isnan(y):
                             xs.append(x)
                             ys.append(y)
                             eyeds[f+str(l)]=len(xs)-1
                     except:
                         print("yeesh")
+    for k in stats.keys():
+        print(k,np.nanmean(stats[k]),np.nanstd(stats[k]))
     xs = np.asarray(([xs])).reshape((-1, 1))
     model = LinearRegression().fit(xs, ys)
     rho0 = 1025

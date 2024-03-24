@@ -920,7 +920,7 @@ function nTimeSteps = setParams (exp_name,inputpath,codepath,listterm,Nx,Ny,Nr,e
           end
           Pressure = -rhoConst*g*zz(k);    
           rhoShelfIce = densmdjwf(sNorth(k),tNorth(k),Pressure/Pa1dbar);
-          SHELFICEloadAnomaly(i,j) = SHELFICEloadAnomaly(i,j) + (g*(rhoShelfIce-rhoConst)*zz(k));                
+          SHELFICEloadAnomaly(i,j) = SHELFICEloadAnomaly(i,j) + (g*(rhoShelfIce-rhoConst)*dz(k));                
          end
        end
     end

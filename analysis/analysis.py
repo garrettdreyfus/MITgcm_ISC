@@ -6,29 +6,54 @@ from scipy.integrate import quad
 
 ## Get temperature at depth)
 def intTemp(depth,fname):
-    variables = grabMatVars(fname,('tNorth','tEast','zz',''))
+    variables = grabMatVars(fname,('tNorth','tEast','sEast','zz','pp'))
     ## forcing temperature along eastern boundary
     tEast = np.asarray(variables["tEast"])#[0]+1.8
+    sEast = np.asarray(variables["sEast"])#[0]+1.8
     zz = np.asarray(variables["zz"])[0]
+    pp = np.asarray(variables["pp"])[0]
     ## forcing temperature at north eastern end of domain
-    tEast = tEast[int(tEast.shape[0]-1)]+1.8
+    tEast = tEast[int(tEast.shape[0]-1)]
+    sEast = sEast[int(sEast.shape[0]-1)]
+    Tf= (0.0901-0.0575*sEast) - (7.61*10**(-4))*pp
+    tEast = tEast-Tf
     f_interp = lambda xx: np.interp(xx, zz[::-1], tEast[::-1])
     results = []
     ls = []
     ## integrate and average temperature 25 meters above hub depth
-    result = quad(f_interp,depth,min(depth+25,0), points = zz[::-1])[0]
-    result = ((result/min(25,abs(depth))))
+    result = quad(f_interp,depth,min(depth+100,0), points = zz[::-1])[0]
+    result = ((result/min(100,abs(depth))))
     return result
 
 ## Calculates slope of ice shelf from either the model parameters (param option) or from a point on the ice shelf
     # the ice shelf is linear so these methods are identical
-def slope(fname,method="grad"):
+def slope(fname,method="lstsq"):
+    if method == "lstsq":
+        variables = grabMatVars(fname,('icedraft',"h","YY","xx","yy","Yicefront","XX"))
+        icedraft = np.asarray(variables["icedraft"]).T
+        h = np.asarray(variables["h"])
+        xx = np.asarray(variables["xx"])
+        yy = np.asarray(variables["yy"])
+        X,Y = np.meshgrid(xx,yy)
+
+        icedraft[icedraft==0]=np.nan
+        X=X[~np.isnan(icedraft)]
+        Y=Y[~np.isnan(icedraft)]
+        flatclipped=icedraft[~np.isnan(icedraft)]
+        A = np.vstack([X,Y, np.ones(len(X))]).T
+        m1,m2, c = np.linalg.lstsq(A, flatclipped, rcond=None)[0]
+        m1=np.abs(m1)
+        m2=np.abs(m2)
+        print(m1,m2)
+        return np.sqrt(m1**2+m2**2)
+
+
     if method == "param":
         variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft','tEast','zz','yy',"xx","Yicefront"))
         y = np.asarray(variables["Yicefront"])[0][0]
         icedraft = np.asarray(variables["icedraft"])
         zgl = np.nanmin(icedraft)-np.nanmax(icedraft[icedraft!=0])
-        return (abs(zgl)-200)/y
+        return ((abs(zgl)-200)/y)/2
     if method == "grad":
         variables = grabMatVars(fname,('icedraft',"h","YY","xx","yy","Yicefront"))
         icedraft = np.asarray(variables["icedraft"])
@@ -44,7 +69,7 @@ def slope(fname,method="grad"):
         grad = np.sqrt(np.sum(grad,axis=0))
         return np.nanmedian(grad[np.logical_and(icedraft!=0,diff!=0)])#np.mean(diff[np.logical_and(icedraft!=0,diff!=0)]) #+ abs(zglib-zgl)/y
 
-def FStheory(fname,xval):
+def FStheory(fname,xval,include_stats=False):
 
     #pull in timeseries data for returning the diagnosed meltrate 
     data = timeSeries(fname)
@@ -81,18 +106,19 @@ def FStheory(fname,xval):
     ## ice shelf slope
     ices = slope(fname)
     #density using model density function
-    localdens = dens(sNorth,tNorth,abs(0))
     zz = np.asarray(variables["zz"])[0]
+    localdens = dens(sNorth,tNorth,abs(zz))
     ## density gradient
     gradd = np.abs(np.diff(localdens)/np.diff(zz))
     #average depth of all above 80th percentile
-    tcline_height=np.mean(zz[:-1][gradd>np.quantile(gradd,0.8)])#+75
+    tcline_height=np.mean(zz[:-1][gradd>np.quantile(gradd,0.85)])#+75
     zpyci = np.argmin(np.abs(np.abs(zz)-abs(tcline_height)))
+    localdens = dens(sNorth,tNorth,abs(zz[zpyci]))
 
     ## calculation of gprime
-    rho_1i = np.logical_and(zz<zz[zpyci],zz>zz[zpyci]-30)
-    rho_2i = np.logical_and(zz<zz[zpyci]+30,zz>zz[zpyci])
-    gprime_ext = 9.8*(np.mean(localdens[rho_1i])-np.mean(localdens[rho_2i]))/np.mean(localdens[np.logical_or(rho_1i,rho_2i)])
+    rho_1i = np.logical_and(zz<zz[zpyci],zz>zz[zpyci]-50)
+    rho_2i = np.logical_and(zz<zz[zpyci]+50,zz>zz[zpyci])
+    gprime_ext = 9.8*(np.nanmean(localdens[rho_1i])-np.nanmean(localdens[rho_2i]))/np.mean(localdens[np.logical_or(rho_1i,rho_2i)])
 
     deltaH = -(abs(tcline_height)- abs(hub))
     if "reference" in fname and "at125" in fname:
@@ -105,7 +131,11 @@ def FStheory(fname,xval):
     rhoi = 910
     Cp = 4186
     If = 334000
-    return (Tcdw)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365)
+    stats = {"deltaH":deltaH,"Tcdw":Tcdw,"gprime":gprime_ext,"ices":ices}
+    if not include_stats:
+        return (Tcdw)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365)
+    else:
+        return (Tcdw)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365),stats
 
 #condstructing depth from depth differences
 def depthFromdZ(ds):

@@ -1,4 +1,5 @@
 from graph import folderMap 
+import graph
 import matplotlib.pyplot as plt
 
 
@@ -19,12 +20,12 @@ runsdict = {\
 #folderMapTimeSeries(runsdict)
 folderMap(runsdict)
 #folderMapGeneric(gprimeWidth,runsdict)
-plt.show()
+#plt.show()
 #plt.show()
 #crossSectionAverage("/home/garrett/Projects/MITgcm_ISC/experiments/reference/at125/results","Reference")
 #plt.show()
-#circulationFigure("/home/garrett/Projects/MITgcm_ISC/experiments/reference/at125/results","Reference")
-#plt.show()
+#graph.circulationFigure("/home/garrett/Projects/MITgcm_ISC/experiments/reference/at125/results","Reference")
+plt.show()
 
 #folderMapGeneric(steadyStateAverageSimple,runsdict)
 #folderMapGeneric(gprimeWidth,runsdict)
