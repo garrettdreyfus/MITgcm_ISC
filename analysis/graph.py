@@ -3,11 +3,16 @@ import matplotlib.pyplot as plt
 import xarray as xr
 import glob
 from sklearn.linear_model import LinearRegression
-from analysis import FStheory
-from datainput import timeSeries, matVarsFile, getIterNums, grabDeltaT
+from analysis import FStheory,slope
+from datainput import timeSeries, matVarsFile, getIterNums, grabDeltaT, outPath, grabMatVars
 from xmitgcm import open_mdsdataset
 from matlabglib import GLIBfromFile
+import matplotlib as mpl
+from matplotlib.patches import Polygon
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from astropy.convolution import convolve, Box2DKernel
 import cmocean
+
 
 def barotropic_streamfunction_max(fname,times=np.array([]),res=1):
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
@@ -529,6 +534,7 @@ def crossSectionAverage(fname,description,quant="THETA",res=1,dim="zonal",ax1=No
     variables = grabMatVars(fname,("Xeast","Xwest","Yicefront"))
     yice = float(variables["Yicefront"])/1000
     ices = slope(fname)
+    print("slope: ",ices)
     C=(-.205)-yice*ices
     y = np.array([[0.05,0], [0.05,0.05*ices+C], [yice + 0.8,-.205-0.1], [yice + 0.8,0], [0.05,0]])
     p = Polygon(y, facecolor = '#8addf9',zorder=4)
@@ -625,6 +631,7 @@ def barotropic_streamfunction_max(fname,times=np.array([]),res=1):
     return bts
 
 def circulationFigure(fname,description,times=np.array([])):
+    mpl.rcParams['savefig.dpi'] = 500
     extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
     times=getIterNums(fname)
     ds = open_mdsdataset(fname,prefix=["THETA","SALT","momKE","SHIfwFlx","VVEL","UVEL","WVEL"],ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
@@ -658,8 +665,8 @@ def circulationFigure(fname,description,times=np.array([])):
             zc = np.where(np.diff(np.sign(theta[:,i,j]-0.5)))[0]
             if len(zc)>0:
                 interfacez[i,j] = zs[zc[0]]
-                interfaceu[i,j] = uvel[zc[0],i,j]
-                interfacev[i,j] = vvel[zc[0],i,j]
+                interfaceu[i,j] = np.nanmean((uvel[zc[0]:,i,j]*zs[zc[0]:]))/np.sum(zs[zc[0]:])
+                interfacev[i,j] = np.nanmean((vvel[zc[0]:,i,j]*zs[zc[0]:]))/np.sum(zs[zc[0]:])
             else:
                 interfacez[i,j] = np.nan
                 interfaceu[i,j] = np.nan
@@ -673,18 +680,37 @@ def circulationFigure(fname,description,times=np.array([])):
     ax1.set_facecolor("#BBAF98")
     xs,ys=xs/1000,ys/1000
     X,Y= np.meshgrid(xs,ys)
+
+    interfacez[np.logical_and(X>275,Y<200)]=np.nan
+    bottomz[np.logical_and(X>275,Y<200)]=np.nan
+    #plt.imshow(np.logical_and(X>275,Y<200))
+    #plt.show()
+ 
     c= plt.pcolormesh(xs,ys,interfacez[:,::-1],cmap=cmocean.cm.deep)
 
     caxout = plt.colorbar(c,aspect=40,shrink=0.8,ticks=range(-900,-199,175))
     caxout.ax.tick_params(labelsize=18)
-    plt.quiver(X[::5,::5],Y[::5,::5],interfaceu[::5,::5],interfacev[::5,::5],color="white")
+    #plt.quiver(X[::5,::5],Y[::5,::5],interfaceu[::5,::5],interfacev[::5,::5],color="white")
+    #plt.quiver(X[::1,::1],Y[::1,::1],interfaceu[::1,::1],interfacev[::1,::1],color="white")
+    box_kernel = Box2DKernel(5,mode="center")
+    X = convolve(X, box_kernel,preserve_nan=True)
+    Y = convolve(Y, box_kernel,preserve_nan=True)
+    interfaceu = convolve(interfaceu, box_kernel,preserve_nan=True,boundary=None)
+    interfacev = convolve(interfacev, box_kernel,preserve_nan=True,boundary=None)
+    interfaceu[np.isnan(interfacez)]=np.nan
+    interfaceu[interfaceu==0]=np.nan
+    interfacev[np.isnan(interfacez)]=np.nan
+    interfacev[interfacev==0]=np.nan
+
+    plt.quiver(X[::5,::5],Y[::5,::5],interfaceu[::5,::5],interfacev[::5,::5],color="white",scale=0.0025,zorder=5,width=0.005)
+    plt.hlines(150,126,271,linewidth=7.5,color="orange")
 
     plt.gca().tick_params(labelsize=15)
-    print(glib)
-    plt.contour(xs,ys,bottomz[:,::-1],[glib-25],colors=["red"],linewidths=4)
-    plt.ylabel(r'x (km)',fontsize=18)
-    plt.xlabel(r'y (km)',fontsize=18)
-    plt.tight_layout
+    glibi = np.argmin(np.abs(np.abs(zs)-np.abs(glib)))
+    plt.contour(xs,ys,bottomz[:,::-1],[zs[glibi+1]],colors=["red"],linewidths=3)
+    plt.ylabel(r'y (km)',fontsize=18)
+    plt.xlabel(r'x (km)',fontsize=18)
+    plt.tight_layout()
     plt.show()
 
 
@@ -1052,8 +1078,10 @@ def folderMap(runsdict,save=True):
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
 
-    plt.xlabel("Melt rate predicted from theory (m/yr)",fontsize=18)
-    plt.ylabel("Diagnosed melt rate from simulation (m/yr)",fontsize=18)
+    plt.gca().set_xlabel(r"$\dot{m}_{\mathrm{pred}} (m/yr)$",fontsize=24)
+    plt.gca().set_ylabel(r'$\dot{m}_{\mathrm{obs}} (m/yr)$',fontsize=24)
+
+
     plt.plot(range(0,25),range(0,25),linestyle="dashed")
     plt.xlim(0,20)
     plt.ylim(0,20)
@@ -1131,12 +1159,64 @@ def folderMapRefresh(runsdict,save=True):
 
             if save:
                 plt.savefig("/home/garrett/Projects/HUB/paperfigures/"+k+".png")
- 
+def meltMapAverage(fname,description,quant="THETA",res=1,dim="zonal",ax1=None):
+    if not ax1:
+        fig,ax1 = plt.subplots(figsize=(10,8))
+    extra_variables = dict( SHIfwFlx = dict(dims=["k","j","i"], attrs=dict(standard_name="Shelf Fresh Water Flux", units="kg/m^3")))
+    times=getIterNums(fname)
+    ds = open_mdsdataset(fname,ignore_unknown_vars=True,extra_variables = extra_variables,iters=times)
+    mask = np.logical_and(ds.hFacC.values[0]==0,np.sum(ds.hFacC.values,axis=0)!=0)
+    times = times*grabDeltaT(fname)/60.0/60.0/24.0/365.0
+    melt= -np.nanmean(ds.SHIfwFlx.values[times>2.5],axis=0)*(60*60*24*365)*(1/920.0)
+    xs = ds.XG.values/1000
+    ys = ds.YG.values/1000
+    newcmap = cmocean.tools.crop(cmocean.cm.balance, 0, 45, 0)
+
+    vals = grabMatVars(fname,("h","icedraft"))
+    icedraft = np.abs(np.asarray(vals["icedraft"]))
+    h = np.abs(np.asarray(vals["h"]))
+    icedraft = np.logical_and(icedraft!=0,icedraft!=h)
+    melt[~icedraft.T]=np.nan
+    
+    im = ax1.pcolormesh(xs,ys,melt,cmap=newcmap,vmin=0,vmax=25)
+
+    bound = np.argwhere(~np.isnan(melt))
+
+    #ax2.set_xlim((140,260))
+    #ax2.set_ylim((0,160))
+    pad = 10
+    ax1.set_xlim(xs[min(bound[:, 1])]-pad, xs[max(bound[:, 1])]+pad)
+    ax1.set_ylim(ys[min(bound[:, 0])]-pad, ys[max(bound[:, 0])]+pad)
+
+    ax1.set_xlabel("x (km)",fontsize=18)
+    ax1.set_ylabel("y (km)",fontsize=18)
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    caxout = inset_axes(
+        ax1,
+        width="2%",  # width: 5% of parent_bbox width
+        height="40%",  # height: 50%
+        loc="lower left",
+        bbox_to_anchor=(1.0, 0.30, 1, 1),
+        bbox_transform=ax1.transAxes,
+        borderpad=1,
+    )
+    caxout.tick_params(labelsize=18)
+    plt.colorbar(im,cax=caxout,ticks=[0,20])
+    caxout.set_ylabel('m/yr', rotation=0,fontsize=18)
+
+    ax1.set_ylabel('Y (km)',fontsize=18)
+    ax1.set_xlabel('X (km)',fontsize=18)
+
+    #caxout = plt.colorbar(im,ax=ax1, aspect=40,shrink=0.4,ticks=range(0,41,10))
+    #caxout.ax.tick_params(labelsize=18)
+    #plt.show() 
 def crossAndMelt(fname,name=""):
     fig,(ax1,ax2) = plt.subplots(1,2,figsize=(15,6))
     plt.subplots_adjust(wspace=0.45)
     crossSectionAverage(fname,"Reference",quant="THETA",dim="zonal",ax1=ax1,show=False)
     meltMapAverage(fname,"",ax1=ax2)
+    plt.show()
     plt.savefig("/home/garrett/Projects/HUB/paperfigures/crossAndMelts/"+name+".png")
     plt.close()
 

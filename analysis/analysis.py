@@ -3,6 +3,7 @@ from matlabglib import GLIBfromFile
 import numpy as np
 from jmd95 import dens
 from scipy.integrate import quad
+import matplotlib.pyplot as plt
 
 ## Get temperature at depth)
 def intTemp(depth,fname):
@@ -16,6 +17,7 @@ def intTemp(depth,fname):
     tEast = tEast[int(tEast.shape[0]-1)]
     sEast = sEast[int(sEast.shape[0]-1)]
     Tf= (0.0901-0.0575*sEast) - (7.61*10**(-4))*pp
+    print(zz[0])
     tEast = tEast-Tf
     f_interp = lambda xx: np.interp(xx, zz[::-1], tEast[::-1])
     results = []
@@ -27,7 +29,7 @@ def intTemp(depth,fname):
 
 ## Calculates slope of ice shelf from either the model parameters (param option) or from a point on the ice shelf
     # the ice shelf is linear so these methods are identical
-def slope(fname,method="lstsq"):
+def slope(fname,method="param"):
     if method == "lstsq":
         variables = grabMatVars(fname,('icedraft',"h","YY","xx","yy","Yicefront","XX"))
         icedraft = np.asarray(variables["icedraft"]).T
@@ -44,16 +46,22 @@ def slope(fname,method="lstsq"):
         m1,m2, c = np.linalg.lstsq(A, flatclipped, rcond=None)[0]
         m1=np.abs(m1)
         m2=np.abs(m2)
-        print(m1,m2)
         return np.sqrt(m1**2+m2**2)
 
 
     if method == "param":
-        variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft','tEast','zz','yy',"xx","Yicefront"))
-        y = np.asarray(variables["Yicefront"])[0][0]
+        variables = grabMatVars(fname,('Zcdw_pt_shelf','icedraft','tEast','zz','yy',"xx","Yicefront","Hicefront","Y"))
+        Y = np.asarray(variables["Y"])
+        yicefront = np.asarray(variables["Yicefront"])[0][0]
+        H = np.asarray(variables["Hicefront"])[0][0]
         icedraft = np.asarray(variables["icedraft"])
+        Y = Y.flatten()
+        icedraft = icedraft.flatten()
+        ygl = np.nanmean(Y[np.nanargmax(np.abs(icedraft))])
+        print(ygl)
         zgl = np.nanmin(icedraft)-np.nanmax(icedraft[icedraft!=0])
-        return ((abs(zgl)-200)/y)/2
+        return ((abs(zgl)-H)/(yicefront-ygl))
+
     if method == "grad":
         variables = grabMatVars(fname,('icedraft',"h","YY","xx","yy","Yicefront"))
         icedraft = np.asarray(variables["icedraft"])
