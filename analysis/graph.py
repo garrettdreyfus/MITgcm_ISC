@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import xarray as xr
 import glob
 from sklearn.linear_model import LinearRegression
-from analysis import FStheory,slope
-from datainput import timeSeries, matVarsFile, getIterNums, grabDeltaT, outPath, grabMatVars
+from analysis import FStheory,slope,timeSeries
+from datainput import  matVarsFile, getIterNums, grabDeltaT, outPath, grabMatVars
 from xmitgcm import open_mdsdataset
 from matlabglib import GLIBfromFile
 import matplotlib as mpl
