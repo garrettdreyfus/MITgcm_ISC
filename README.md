@@ -1,6 +1,6 @@
 # Introduction
 
-Hello! This is the github repository for the ideallized modelling component of [Geostrophically Constrained Flow of Warm Subsurface Waters Into Geometrically Complex Ice Shelf Cavities](https://essopenarchive.org/doi/full/10.22541/essoar.170594141.13133501/v1) . 
+Hello! This is the github repository for the ideallized modelling component of [A Predictive Theory for Heat Transport Into Ice Shelf Cavities](https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2024GL108196) . 
 
 The code for creating the MITgcm runs is in the newexp and newexp\_utils folders. The file with most of the model setup is newexp/setParams.m and to a lesser extent newexp/newexp.m
 
