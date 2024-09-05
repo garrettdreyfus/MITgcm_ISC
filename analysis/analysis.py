@@ -1,11 +1,11 @@
 from datainput import *
 from matlabglib import GLIBfromFile
+import os
 import numpy as np
 from jmd95 import dens
 from scipy.integrate import quad
 from xmitgcm import open_mdsdataset
 import matplotlib.pyplot as plt
-import os, getIterNums
 
 ## Get temperature at depth)
 def intTemp(depth,fname):
@@ -19,12 +19,12 @@ def intTemp(depth,fname):
     tEast = tEast[int(tEast.shape[0]-1)]
     sEast = sEast[int(sEast.shape[0]-1)]
     Tf= (0.0901-0.0575*sEast) - (7.61*10**(-4))*pp
-    print(zz[0])
     tEast = tEast-Tf
     f_interp = lambda xx: np.interp(xx, zz[::-1], tEast[::-1])
     results = []
     ls = []
-    ## integrate and average temperature 25 meters above hub depth
+    ## integrate and average temperature 100 meters above hub depth
+    print(depth,depth+100)
     result = quad(f_interp,depth,min(depth+100,0), points = zz[::-1])[0]
     result = ((result/min(100,abs(depth))))
     return result
@@ -112,6 +112,7 @@ def FStheory(fname,xval,include_stats=False):
 
     ## Grab temperature at HUB depth
     Tcdw = intTemp(hub,fname)
+    Tint = data["bottemp"]
 
     ## ice shelf slope
     ices = slope(fname)
@@ -146,6 +147,7 @@ def FStheory(fname,xval,include_stats=False):
         return (Tcdw)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365)
     else:
         return (Tcdw)*deltaH*(gprime_ext)/(f)*ices,-data["shiflx"]/(60*60*24*365),stats
+        #return (Tcdw)*deltaH*(((1.315e-05)*gprime_ext*shelf_width+0.00012971)/(shelf_width*f))*ices,-data["shiflx"]/(60*60*24*365),stats
 
 #condstructing depth from depth differences
 def depthFromdZ(ds):
